@@ -293,7 +293,7 @@ app.post('/v1/verify/send', async (req, res) => {
       phone: normalizedPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1 (***) ***-$4') // Mask for privacy
     });
   } catch (error) {
-    console.error('Error sending verification:', error);
+    console.error('Error sending verification:', error.message, error.code, error.status);
 
     // Handle specific Twilio errors
     if (error.code === 60200) {
@@ -302,8 +302,14 @@ app.post('/v1/verify/send', async (req, res) => {
     if (error.code === 60203) {
       return res.status(429).json({ error: 'Too many verification attempts. Please wait.' });
     }
+    if (error.code === 20003) {
+      return res.status(401).json({ error: 'Twilio authentication failed' });
+    }
+    if (error.code === 60205) {
+      return res.status(400).json({ error: 'SMS not supported for this number. Try a different number.' });
+    }
 
-    res.status(500).json({ error: 'Failed to send verification code' });
+    res.status(500).json({ error: error.message || 'Failed to send verification code' });
   }
 });
 
