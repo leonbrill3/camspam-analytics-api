@@ -57,7 +57,9 @@ app.get('/debug/twilio', (req, res) => {
     verifyServiceConfigured: !!TWILIO_VERIFY_SERVICE_SID,
     accountSidPrefix: process.env.TWILIO_ACCOUNT_SID ? process.env.TWILIO_ACCOUNT_SID.substring(0, 10) + '...' : null,
     authTokenSet: !!process.env.TWILIO_AUTH_TOKEN,
-    verifyServiceSidPrefix: TWILIO_VERIFY_SERVICE_SID ? TWILIO_VERIFY_SERVICE_SID.substring(0, 10) + '...' : null
+    verifyServiceSidPrefix: TWILIO_VERIFY_SERVICE_SID ? TWILIO_VERIFY_SERVICE_SID.substring(0, 10) + '...' : null,
+    databaseUrlSet: !!process.env.DATABASE_URL,
+    databaseUrlHost: process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).host : null
   });
 });
 
