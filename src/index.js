@@ -309,7 +309,11 @@ app.post('/v1/verify/send', async (req, res) => {
       return res.status(400).json({ error: 'SMS not supported for this number. Try a different number.' });
     }
 
-    res.status(500).json({ error: error.message || 'Failed to send verification code' });
+    res.status(500).json({
+      error: error.message || 'Failed to send verification code',
+      code: error.code,
+      details: error.moreInfo || null
+    });
   }
 });
 
