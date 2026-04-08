@@ -52,6 +52,49 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// One-time migration endpoint (remove after first run)
+app.get('/migrate', async (req, res) => {
+  try {
+    const client = await pool.connect();
+    try {
+      // Create events table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS events (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          category VARCHAR(50) NOT NULL DEFAULT 'engagement',
+          properties JSONB DEFAULT '{}',
+          timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          user_id VARCHAR(100),
+          device_id VARCHAR(100) NOT NULL,
+          session_id VARCHAR(100),
+          session_duration_seconds INTEGER DEFAULT 0,
+          app_version VARCHAR(20),
+          build_number VARCHAR(20),
+          platform VARCHAR(20) DEFAULT 'ios',
+          os_version VARCHAR(20),
+          device_model VARCHAR(50),
+          locale VARCHAR(20),
+          timezone VARCHAR(50),
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      // Create indexes
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_events_name ON events(name);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_events_device_id ON events(device_id);`);
+
+      res.json({ success: true, message: 'Migration completed' });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================
 // EVENTS API
 // ============================================
