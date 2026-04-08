@@ -318,17 +318,30 @@ app.post('/v1/verify/send', async (req, res) => {
     const twilioUrl = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/Verifications`;
     const authString = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
 
-    const twilioResponse = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${authString}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        'To': normalizedPhone,
-        'Channel': 'sms'
-      })
-    });
+    console.log(`Attempting to call Twilio at: ${twilioUrl}`);
+
+    let twilioResponse;
+    try {
+      twilioResponse = await fetch(twilioUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${authString}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          'To': normalizedPhone,
+          'Channel': 'sms'
+        })
+      });
+    } catch (fetchError) {
+      console.error('Fetch to Twilio failed:', {
+        name: fetchError.name,
+        message: fetchError.message,
+        code: fetchError.code,
+        cause: fetchError.cause
+      });
+      throw fetchError;
+    }
 
     const verification = await twilioResponse.json();
 
