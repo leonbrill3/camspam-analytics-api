@@ -1,0 +1,23 @@
+# Render Blueprint for CamSpam Analytics API
+# Deploy with: render blueprint sync
+
+services:
+  - type: web
+    name: camspam-analytics-api
+    env: node
+    plan: starter # $7/month - upgrade as needed
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: camspam-db
+          property: connectionString
+
+databases:
+  - name: camspam-db
+    plan: starter # $7/month - 1GB storage
+    postgresMajorVersion: 15
