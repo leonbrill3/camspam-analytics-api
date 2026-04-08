@@ -61,6 +61,38 @@ app.get('/debug/twilio', (req, res) => {
   });
 });
 
+// Debug endpoint - test network connectivity to Twilio
+app.get('/debug/network', async (req, res) => {
+  const results = {};
+
+  // Test 1: Basic DNS resolution
+  try {
+    const dns = require('dns').promises;
+    const addresses = await dns.lookup('verify.twilio.com');
+    results.dnsLookup = { success: true, address: addresses };
+  } catch (e) {
+    results.dnsLookup = { success: false, error: e.message };
+  }
+
+  // Test 2: Fetch to a simple endpoint
+  try {
+    const response = await fetch('https://api.twilio.com/', { method: 'GET' });
+    results.twilioApiReachable = { success: true, status: response.status };
+  } catch (e) {
+    results.twilioApiReachable = { success: false, error: e.message, code: e.code };
+  }
+
+  // Test 3: Fetch to Google (known working endpoint)
+  try {
+    const response = await fetch('https://www.google.com/', { method: 'GET' });
+    results.googleReachable = { success: true, status: response.status };
+  } catch (e) {
+    results.googleReachable = { success: false, error: e.message };
+  }
+
+  res.json(results);
+});
+
 // One-time migration endpoint (remove after first run)
 app.get('/migrate', async (req, res) => {
   try {
