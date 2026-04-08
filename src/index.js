@@ -5,7 +5,11 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const path = require('path');
+const dns = require('dns');
 const twilio = require('twilio');
+
+// Force IPv4 to avoid ECONNREFUSED on some cloud platforms
+dns.setDefaultResultOrder('ipv4first');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
