@@ -6,7 +6,7 @@ services:
     name: camspam-analytics-api
     env: node
     plan: starter # $7/month - upgrade as needed
-    buildCommand: npm install
+    buildCommand: npm install && npm run migrate
     startCommand: npm start
     healthCheckPath: /health
     envVars:
