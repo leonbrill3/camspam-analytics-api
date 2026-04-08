@@ -946,6 +946,58 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Geographic & Demographics Section -->
+                <h2 style="margin: 32px 0 16px; font-size: 18px; color: var(--text-secondary);">📍 Geographic & Demographics</h2>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Users by Country</div>
+                                <div class="chart-subtitle">Based on device locale</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="countryChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Users by Language</div>
+                                <div class="chart-subtitle">Primary device language</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="languageChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Users by Timezone</div>
+                                <div class="chart-subtitle">Geographic distribution by time zone</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="timezoneChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">iOS Version Distribution</div>
+                                <div class="chart-subtitle">Operating system versions</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="osChart"></canvas>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- ==================== ENGAGEMENT PAGE ==================== -->
@@ -1437,6 +1489,31 @@
                 options: { ...chartOptions, indexAxis: 'y' }
             });
 
+            // Geographic Charts
+            charts.country = new Chart(document.getElementById('countryChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(249, 115, 22, 0.8)', 'rgba(168, 85, 247, 0.8)', 'rgba(236, 72, 153, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(234, 179, 8, 0.8)', 'rgba(20, 184, 166, 0.8)'], borderWidth: 0 }] },
+                options: doughnutOptions
+            });
+
+            charts.language = new Chart(document.getElementById('languageChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Users', data: [], backgroundColor: 'rgba(16, 185, 129, 0.6)', borderRadius: 4 }] },
+                options: { ...chartOptions, indexAxis: 'y' }
+            });
+
+            charts.timezone = new Chart(document.getElementById('timezoneChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Users', data: [], backgroundColor: 'rgba(59, 130, 246, 0.6)', borderRadius: 4 }] },
+                options: { ...chartOptions, indexAxis: 'y' }
+            });
+
+            charts.os = new Chart(document.getElementById('osChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(102, 126, 234, 0.8)', 'rgba(118, 75, 162, 0.8)', 'rgba(168, 85, 247, 0.8)', 'rgba(139, 92, 246, 0.8)', 'rgba(99, 102, 241, 0.8)'], borderWidth: 0 }] },
+                options: doughnutOptions
+            });
+
             // Engagement Charts
             charts.engagement = new Chart(document.getElementById('engagementChart'), {
                 type: 'bar',
@@ -1516,7 +1593,8 @@
                     fetchFeatures(),
                     fetchFunnel(),
                     fetchRealtime(),
-                    fetchRetention()
+                    fetchRetention(),
+                    fetchAcquisition()
                 ]);
 
                 document.getElementById('lastUpdate').textContent = `Updated ${new Date().toLocaleTimeString()}`;
@@ -1776,29 +1854,140 @@
             }
         }
 
+        async function fetchAcquisition() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/acquisition?days=${currentDays}`);
+                const data = await res.json();
+
+                // Country chart (locale-based)
+                if (data.geo_breakdown?.length > 0) {
+                    const countryLabels = data.geo_breakdown.map(g => countryCodeToName(g.country));
+                    const countryData = data.geo_breakdown.map(g => parseInt(g.users));
+                    charts.country.data.labels = countryLabels;
+                    charts.country.data.datasets[0].data = countryData;
+                    charts.country.update();
+                }
+
+                // Language chart
+                if (data.language_breakdown?.length > 0) {
+                    const langLabels = data.language_breakdown.map(l => languageCodeToName(l.language));
+                    const langData = data.language_breakdown.map(l => parseInt(l.users));
+                    charts.language.data.labels = langLabels;
+                    charts.language.data.datasets[0].data = langData;
+                    charts.language.update();
+                }
+
+                // Timezone chart
+                if (data.timezone_breakdown?.length > 0) {
+                    const tzLabels = data.timezone_breakdown.map(t => t.timezone?.split('/').pop() || t.timezone);
+                    const tzData = data.timezone_breakdown.map(t => parseInt(t.users));
+                    charts.timezone.data.labels = tzLabels.slice(0, 10);
+                    charts.timezone.data.datasets[0].data = tzData.slice(0, 10);
+                    charts.timezone.update();
+                }
+
+                // OS version chart
+                if (data.os_breakdown?.length > 0) {
+                    const osLabels = data.os_breakdown.map(o => 'iOS ' + o.os_version);
+                    const osData = data.os_breakdown.map(o => parseInt(o.users));
+                    charts.os.data.labels = osLabels;
+                    charts.os.data.datasets[0].data = osData;
+                    charts.os.update();
+                }
+
+                // Device breakdown
+                if (data.device_breakdown?.length > 0) {
+                    const deviceLabels = data.device_breakdown.map(d => formatDeviceModel(d.device_model));
+                    const deviceData = data.device_breakdown.map(d => parseInt(d.users));
+                    charts.devices.data.labels = deviceLabels;
+                    charts.devices.data.datasets[0].data = deviceData;
+                    charts.devices.update();
+                }
+
+                // New users chart
+                if (data.installs_by_day?.length > 0) {
+                    const sortedInstalls = [...data.installs_by_day].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    charts.newUsers.data.labels = sortedInstalls.map(d => formatDate(d.date));
+                    charts.newUsers.data.datasets[0].data = sortedInstalls.map(d => parseInt(d.installs));
+                    charts.newUsers.update();
+
+                    // Update new users stat
+                    const totalNew = sortedInstalls.reduce((sum, d) => sum + parseInt(d.installs), 0);
+                    document.getElementById('newUsers').textContent = formatNumber(totalNew);
+                }
+            } catch (e) {
+                console.log('Acquisition data not available:', e);
+            }
+        }
+
+        function countryCodeToName(code) {
+            const countries = {
+                'US': '🇺🇸 United States', 'GB': '🇬🇧 UK', 'CA': '🇨🇦 Canada', 'AU': '🇦🇺 Australia',
+                'DE': '🇩🇪 Germany', 'FR': '🇫🇷 France', 'JP': '🇯🇵 Japan', 'CN': '🇨🇳 China',
+                'IN': '🇮🇳 India', 'BR': '🇧🇷 Brazil', 'MX': '🇲🇽 Mexico', 'ES': '🇪🇸 Spain',
+                'IT': '🇮🇹 Italy', 'NL': '🇳🇱 Netherlands', 'SE': '🇸🇪 Sweden', 'NO': '🇳🇴 Norway',
+                'DK': '🇩🇰 Denmark', 'FI': '🇫🇮 Finland', 'PL': '🇵🇱 Poland', 'RU': '🇷🇺 Russia',
+                'KR': '🇰🇷 Korea', 'SG': '🇸🇬 Singapore', 'HK': '🇭🇰 Hong Kong', 'TW': '🇹🇼 Taiwan',
+                'NZ': '🇳🇿 New Zealand', 'IE': '🇮🇪 Ireland', 'CH': '🇨🇭 Switzerland', 'AT': '🇦🇹 Austria',
+                'BE': '🇧🇪 Belgium', 'PT': '🇵🇹 Portugal', 'AR': '🇦🇷 Argentina', 'CL': '🇨🇱 Chile'
+            };
+            return countries[code] || code || 'Unknown';
+        }
+
+        function languageCodeToName(code) {
+            const languages = {
+                'en': '🇬🇧 English', 'es': '🇪🇸 Spanish', 'fr': '🇫🇷 French', 'de': '🇩🇪 German',
+                'ja': '🇯🇵 Japanese', 'zh': '🇨🇳 Chinese', 'pt': '🇵🇹 Portuguese', 'it': '🇮🇹 Italian',
+                'ko': '🇰🇷 Korean', 'ru': '🇷🇺 Russian', 'ar': '🇸🇦 Arabic', 'hi': '🇮🇳 Hindi',
+                'nl': '🇳🇱 Dutch', 'sv': '🇸🇪 Swedish', 'da': '🇩🇰 Danish', 'no': '🇳🇴 Norwegian',
+                'fi': '🇫🇮 Finnish', 'pl': '🇵🇱 Polish', 'tr': '🇹🇷 Turkish', 'th': '🇹🇭 Thai'
+            };
+            return languages[code] || code || 'Unknown';
+        }
+
+        function formatDeviceModel(model) {
+            if (!model) return 'Unknown';
+            // iPhone models
+            if (model.startsWith('iPhone')) {
+                const mapping = {
+                    'iPhone15,2': 'iPhone 14 Pro', 'iPhone15,3': 'iPhone 14 Pro Max',
+                    'iPhone14,7': 'iPhone 14', 'iPhone14,8': 'iPhone 14 Plus',
+                    'iPhone16,1': 'iPhone 15 Pro', 'iPhone16,2': 'iPhone 15 Pro Max',
+                    'iPhone15,4': 'iPhone 15', 'iPhone15,5': 'iPhone 15 Plus',
+                    'iPhone17,1': 'iPhone 16 Pro', 'iPhone17,2': 'iPhone 16 Pro Max',
+                    'iPhone17,3': 'iPhone 16', 'iPhone17,4': 'iPhone 16 Plus',
+                    'iPhone14,5': 'iPhone 13', 'iPhone14,4': 'iPhone 13 mini',
+                    'iPhone14,2': 'iPhone 13 Pro', 'iPhone14,3': 'iPhone 13 Pro Max'
+                };
+                return mapping[model] || model;
+            }
+            return model;
+        }
+
         async function fetchRetention() {
             try {
                 const res = await fetch(`${API_BASE}/v1/stats/retention?days=${currentDays}`);
                 const data = await res.json();
 
-                if (data.d1_retention !== undefined) {
-                    document.getElementById('d1Retention').textContent = data.d1_retention + '%';
-                    document.getElementById('d7Retention').textContent = (data.d7_retention || '-') + '%';
-                    document.getElementById('d7RetentionAcq').textContent = (data.d7_retention || '-') + '%';
-                    document.getElementById('d30Retention').textContent = (data.d30_retention || '-') + '%';
+                if (data.overall?.d1_retention !== undefined) {
+                    document.getElementById('d1Retention').textContent = data.overall.d1_retention + '%';
+                    document.getElementById('d7Retention').textContent = (data.overall.d7_retention || '-') + '%';
+                    document.getElementById('d7RetentionAcq').textContent = (data.overall.d7_retention || '-') + '%';
+                    document.getElementById('d30Retention').textContent = (data.overall.d30_retention || '-') + '%';
                 }
 
                 if (data.cohorts?.length > 0) {
                     const tbody = document.getElementById('retentionBody');
                     tbody.innerHTML = data.cohorts.map(cohort => {
+                        const cohortDate = new Date(cohort.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                         return `
                             <tr>
-                                <td>${cohort.cohort_date}</td>
-                                <td><span class="retention-cell ${getRetentionClass(cohort.d1)}">${cohort.d1}%</span></td>
-                                <td><span class="retention-cell ${getRetentionClass(cohort.d3)}">${cohort.d3}%</span></td>
-                                <td><span class="retention-cell ${getRetentionClass(cohort.d7)}">${cohort.d7}%</span></td>
-                                <td><span class="retention-cell ${getRetentionClass(cohort.d14)}">${cohort.d14}%</span></td>
-                                <td><span class="retention-cell ${getRetentionClass(cohort.d30)}">${cohort.d30}%</span></td>
+                                <td>${cohortDate} (${cohort.cohort_size})</td>
+                                <td><span class="retention-cell ${getRetentionClass(parseFloat(cohort.d1_rate))}">${cohort.d1_rate}%</span></td>
+                                <td><span class="retention-cell">-</span></td>
+                                <td><span class="retention-cell ${getRetentionClass(parseFloat(cohort.d7_rate))}">${cohort.d7_rate}%</span></td>
+                                <td><span class="retention-cell">-</span></td>
+                                <td><span class="retention-cell ${getRetentionClass(parseFloat(cohort.d30_rate))}">${cohort.d30_rate}%</span></td>
                             </tr>
                         `;
                     }).join('');

@@ -747,7 +747,10 @@ app.get('/v1/stats/acquisition', async (req, res) => {
       installsBySource,
       organicVsPaid,
       deviceBreakdown,
-      geoBreakdown
+      geoBreakdown,
+      timezoneBreakdown,
+      languageBreakdown,
+      osBreakdown
     ] = await Promise.all([
       // New installs by day
       pool.query(`
@@ -812,11 +815,47 @@ app.get('/v1/stats/acquisition', async (req, res) => {
       // Geographic breakdown by locale/timezone
       pool.query(`
         SELECT
-          COALESCE(SPLIT_PART(locale, '_', 2), locale, 'Unknown') as country,
+          COALESCE(NULLIF(SPLIT_PART(locale, '_', 2), ''), locale, 'Unknown') as country,
           COUNT(DISTINCT device_id) as users
         FROM events
         WHERE timestamp >= $1 AND locale IS NOT NULL
         GROUP BY country
+        ORDER BY users DESC
+        LIMIT 10
+      `, [startDate.toISOString()]),
+
+      // Timezone distribution
+      pool.query(`
+        SELECT
+          timezone,
+          COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE timestamp >= $1 AND timezone IS NOT NULL
+        GROUP BY timezone
+        ORDER BY users DESC
+        LIMIT 15
+      `, [startDate.toISOString()]),
+
+      // Language breakdown
+      pool.query(`
+        SELECT
+          COALESCE(SPLIT_PART(locale, '_', 1), 'unknown') as language,
+          COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE timestamp >= $1 AND locale IS NOT NULL
+        GROUP BY language
+        ORDER BY users DESC
+        LIMIT 10
+      `, [startDate.toISOString()]),
+
+      // OS version breakdown
+      pool.query(`
+        SELECT
+          os_version,
+          COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE timestamp >= $1 AND os_version IS NOT NULL
+        GROUP BY os_version
         ORDER BY users DESC
         LIMIT 10
       `, [startDate.toISOString()])
@@ -827,7 +866,10 @@ app.get('/v1/stats/acquisition', async (req, res) => {
       installs_by_source: installsBySource.rows,
       organic_vs_paid: organicVsPaid.rows[0] || { organic: 0, paid: 0 },
       device_breakdown: deviceBreakdown.rows,
-      geo_breakdown: geoBreakdown.rows
+      geo_breakdown: geoBreakdown.rows,
+      timezone_breakdown: timezoneBreakdown.rows,
+      language_breakdown: languageBreakdown.rows,
+      os_breakdown: osBreakdown.rows
     });
   } catch (error) {
     console.error('Error fetching acquisition stats:', error);
