@@ -304,7 +304,13 @@ app.post('/v1/verify/send', async (req, res) => {
       phone: normalizedPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1 (***) ***-$4') // Mask for privacy
     });
   } catch (error) {
-    console.error('Error sending verification:', error.message, error.code, error.status);
+    console.error('Error sending verification:', {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+      stack: error.stack,
+      name: error.name
+    });
 
     // Handle specific Twilio errors
     if (error.code === 60200) {
@@ -323,6 +329,7 @@ app.post('/v1/verify/send', async (req, res) => {
     res.status(500).json({
       error: error.message || 'Failed to send verification code',
       code: error.code,
+      name: error.name,
       details: error.moreInfo || null
     });
   }
