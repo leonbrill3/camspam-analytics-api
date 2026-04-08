@@ -46,6 +46,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint - check Twilio configuration
+app.get('/debug/twilio', (req, res) => {
+  res.json({
+    twilioConfigured: !!twilioClient,
+    verifyServiceConfigured: !!TWILIO_VERIFY_SERVICE_SID,
+    accountSidPrefix: process.env.TWILIO_ACCOUNT_SID ? process.env.TWILIO_ACCOUNT_SID.substring(0, 10) + '...' : null,
+    authTokenSet: !!process.env.TWILIO_AUTH_TOKEN,
+    verifyServiceSidPrefix: TWILIO_VERIFY_SERVICE_SID ? TWILIO_VERIFY_SERVICE_SID.substring(0, 10) + '...' : null
+  });
+});
+
 // One-time migration endpoint (remove after first run)
 app.get('/migrate', async (req, res) => {
   try {
