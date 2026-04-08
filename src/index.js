@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,10 +16,15 @@ const pool = new Pool({
 });
 
 // Middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false // Allow inline scripts for dashboard
+}));
 app.use(cors());
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
+
+// Serve static dashboard
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Rate limiting - 1000 requests per minute per IP
 const limiter = rateLimit({
@@ -27,25 +33,6 @@ const limiter = rateLimit({
   message: { error: 'Too many requests' }
 });
 app.use('/v1/events', limiter);
-
-// Root route
-app.get('/', (req, res) => {
-  res.json({
-    name: 'CamSpam Analytics API',
-    version: '1.0.0',
-    endpoints: {
-      health: '/health',
-      events: 'POST /v1/events',
-      stats: {
-        overview: '/v1/stats/overview',
-        users: '/v1/stats/users',
-        features: '/v1/stats/features',
-        funnel: '/v1/stats/funnel',
-        realtime: '/v1/stats/realtime'
-      }
-    }
-  });
-});
 
 // Health check
 app.get('/health', (req, res) => {

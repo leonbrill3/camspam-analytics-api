@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CamSpam Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1::before {
+            content: "📸";
+            -webkit-text-fill-color: initial;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .time-filter {
+            display: flex;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 4px;
+        }
+
+        .time-filter button {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.6);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .time-filter button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+
+        .time-filter button:hover:not(.active) {
+            color: #fff;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .refresh-btn.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .refresh-btn.loading::before {
+            content: "";
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Live indicator */
+        .live-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #10b981;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+
+        .stat-card.revenue {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .stat-card.users {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.1) 100%);
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .stat-card.events {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%);
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .stat-card.photos {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%);
+            border-color: rgba(249, 115, 22, 0.3);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-change {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-change.positive {
+            color: #10b981;
+        }
+
+        .stat-change.negative {
+            color: #ef4444;
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        @media (max-width: 1200px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .chart-card.full-width {
+            grid-column: span 2;
+        }
+
+        @media (max-width: 1200px) {
+            .chart-card.full-width {
+                grid-column: span 1;
+            }
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .chart-subtitle {
+            font-size: 13px;
+            color: rgba(255,255,255,0.5);
+            margin-top: 4px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-container.small {
+            height: 200px;
+        }
+
+        /* Funnel */
+        .funnel-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .funnel-step {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .funnel-bar-container {
+            flex: 1;
+            height: 40px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .funnel-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            transition: width 0.8s ease-out;
+            display: flex;
+            align-items: center;
+            padding-left: 16px;
+        }
+
+        .funnel-label {
+            width: 140px;
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .funnel-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+        }
+
+        .funnel-rate {
+            width: 80px;
+            text-align: right;
+            font-size: 13px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        /* Real-time Feed */
+        .realtime-feed {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .realtime-feed::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .realtime-feed::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
+        }
+
+        .realtime-feed::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+
+        .event-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.03);
+            transition: background 0.2s;
+        }
+
+        .event-item:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .event-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .event-icon.camera { background: rgba(249, 115, 22, 0.2); }
+        .event-icon.gallery { background: rgba(59, 130, 246, 0.2); }
+        .event-icon.subscription { background: rgba(16, 185, 129, 0.2); }
+        .event-icon.lifecycle { background: rgba(168, 85, 247, 0.2); }
+        .event-icon.feature { background: rgba(236, 72, 153, 0.2); }
+        .event-icon.error { background: rgba(239, 68, 68, 0.2); }
+
+        .event-details {
+            flex: 1;
+        }
+
+        .event-name {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+
+        .event-meta {
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .event-time {
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+        }
+
+        /* Tables */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .data-table th {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: rgba(255,255,255,0.5);
+            font-weight: 600;
+        }
+
+        .data-table td {
+            font-size: 14px;
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge.free { background: rgba(107, 114, 128, 0.3); color: #9ca3af; }
+        .badge.pro { background: rgba(59, 130, 246, 0.3); color: #60a5fa; }
+        .badge.max { background: rgba(168, 85, 247, 0.3); color: #c084fc; }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255,255,255,0.5);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-subtext {
+            font-size: 14px;
+            color: rgba(255,255,255,0.3);
+        }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .dashboard {
+                padding: 16px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stat-value {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Header -->
+        <header class="header">
+            <h1>CamSpam Analytics</h1>
+            <div class="header-controls">
+                <div class="live-indicator">
+                    <span class="live-dot"></span>
+                    <span id="lastUpdate">Updating...</span>
+                </div>
+                <div class="time-filter">
+                    <button class="active" data-days="7">7D</button>
+                    <button data-days="30">30D</button>
+                    <button data-days="90">90D</button>
+                </div>
+                <button class="refresh-btn" onclick="refreshAll()">
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card users">
+                <div class="stat-label">👥 Total Users</div>
+                <div class="stat-value" id="totalUsers">-</div>
+                <div class="stat-change positive" id="usersChange">Loading...</div>
+            </div>
+            <div class="stat-card events">
+                <div class="stat-label">📊 Total Events</div>
+                <div class="stat-value" id="totalEvents">-</div>
+                <div class="stat-change positive" id="eventsChange">Loading...</div>
+            </div>
+            <div class="stat-card photos">
+                <div class="stat-label">📸 Photos Captured</div>
+                <div class="stat-value" id="photosCaptured">-</div>
+                <div class="stat-change positive" id="photosChange">Loading...</div>
+            </div>
+            <div class="stat-card revenue">
+                <div class="stat-label">💰 Revenue</div>
+                <div class="stat-value" id="totalRevenue">$0</div>
+                <div class="stat-change positive" id="revenueChange">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="charts-grid">
+            <!-- Daily Active Users -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Daily Active Users</div>
+                        <div class="chart-subtitle">Unique devices per day</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="dauChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Events Over Time -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Events Over Time</div>
+                        <div class="chart-subtitle">Total events per day</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="eventsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Conversion Funnel -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Conversion Funnel</div>
+                        <div class="chart-subtitle">User journey from app open to purchase</div>
+                    </div>
+                </div>
+                <div class="funnel-container" id="funnelContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <div class="empty-state-text">No funnel data yet</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Events -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Top Events</div>
+                        <div class="chart-subtitle">Most frequent events</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="topEventsChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Delete Schedule Distribution -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Delete Schedules</div>
+                        <div class="chart-subtitle">Distribution of auto-delete settings</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="scheduleChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Spam Type Distribution -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Spam Categories</div>
+                        <div class="chart-subtitle">Types of photos captured</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="spamTypeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Users by Tier -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Users by Subscription</div>
+                        <div class="chart-subtitle">Free vs Pro vs Max users</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="tierChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Session Duration -->
+            <div class="chart-card">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">User Engagement</div>
+                        <div class="chart-subtitle">Sessions per user</div>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="engagementChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Events -->
+        <div class="charts-grid">
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <div>
+                        <div class="chart-title">Real-time Event Feed</div>
+                        <div class="chart-subtitle">Last 50 events from the past hour</div>
+                    </div>
+                    <div class="live-indicator">
+                        <span class="live-dot"></span>
+                        <span id="activeUsers">0 active users</span>
+                    </div>
+                </div>
+                <div class="realtime-feed" id="realtimeFeed">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📡</div>
+                        <div class="empty-state-text">Waiting for events...</div>
+                        <div class="empty-state-subtext">Events will appear here in real-time</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = window.location.origin;
+        let currentDays = 7;
+        let charts = {};
+
+        // Chart.js defaults
+        Chart.defaults.color = 'rgba(255,255,255,0.7)';
+        Chart.defaults.borderColor = 'rgba(255,255,255,0.1)';
+        Chart.defaults.font.family = 'Inter, sans-serif';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            refreshAll();
+
+            // Auto-refresh every 30 seconds
+            setInterval(refreshAll, 30000);
+
+            // Time filter buttons
+            document.querySelectorAll('.time-filter button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.time-filter button').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentDays = parseInt(e.target.dataset.days);
+                    refreshAll();
+                });
+            });
+        });
+
+        function initCharts() {
+            // DAU Chart
+            charts.dau = new Chart(document.getElementById('dauChart'), {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Users',
+                        data: [],
+                        borderColor: '#60a5fa',
+                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#60a5fa'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Events Chart
+            charts.events = new Chart(document.getElementById('eventsChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Events',
+                        data: [],
+                        backgroundColor: 'rgba(168, 85, 247, 0.6)',
+                        borderColor: '#a855f7',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Top Events Chart
+            charts.topEvents = new Chart(document.getElementById('topEventsChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Count',
+                        data: [],
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.7)',
+                            'rgba(118, 75, 162, 0.7)',
+                            'rgba(168, 85, 247, 0.7)',
+                            'rgba(236, 72, 153, 0.7)',
+                            'rgba(249, 115, 22, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(59, 130, 246, 0.7)',
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(234, 179, 8, 0.7)',
+                            'rgba(20, 184, 166, 0.7)'
+                        ],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Schedule Chart
+            charts.schedule = new Chart(document.getElementById('scheduleChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(249, 115, 22, 0.8)',
+                            'rgba(234, 179, 8, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { padding: 16 } }
+                    }
+                }
+            });
+
+            // Spam Type Chart
+            charts.spamType = new Chart(document.getElementById('spamTypeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        data: [],
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(236, 72, 153, 0.8)',
+                            'rgba(249, 115, 22, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { padding: 16 } }
+                    }
+                }
+            });
+
+            // Tier Chart
+            charts.tier = new Chart(document.getElementById('tierChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Free', 'Pro', 'Max'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            'rgba(107, 114, 128, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { padding: 16 } }
+                    }
+                }
+            });
+
+            // Engagement Chart
+            charts.engagement = new Chart(document.getElementById('engagementChart'), {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Users',
+                        data: [],
+                        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+                        borderColor: '#10b981',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        async function refreshAll() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.classList.add('loading');
+
+            try {
+                await Promise.all([
+                    fetchOverview(),
+                    fetchUsers(),
+                    fetchFeatures(),
+                    fetchFunnel(),
+                    fetchRealtime()
+                ]);
+
+                document.getElementById('lastUpdate').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+            } catch (error) {
+                console.error('Error refreshing data:', error);
+            }
+
+            btn.classList.remove('loading');
+        }
+
+        async function fetchOverview() {
+            const res = await fetch(`${API_BASE}/v1/stats/overview?days=${currentDays}`);
+            const data = await res.json();
+
+            document.getElementById('totalUsers').textContent = formatNumber(data.total_users);
+            document.getElementById('totalEvents').textContent = formatNumber(data.total_events);
+            document.getElementById('totalRevenue').textContent = formatCurrency(data.revenue?.total || 0);
+
+            document.getElementById('usersChange').textContent = `${data.total_users} unique devices`;
+            document.getElementById('eventsChange').textContent = `Last ${currentDays} days`;
+            document.getElementById('revenueChange').textContent = `${data.revenue?.purchases || 0} purchases`;
+
+            // Update DAU chart
+            if (data.daily_active_users && data.daily_active_users.length > 0) {
+                const sorted = [...data.daily_active_users].sort((a, b) => new Date(a.date) - new Date(b.date));
+                charts.dau.data.labels = sorted.map(d => formatDate(d.date));
+                charts.dau.data.datasets[0].data = sorted.map(d => d.count);
+                charts.dau.update();
+            }
+
+            // Update top events chart
+            if (data.top_events && data.top_events.length > 0) {
+                charts.topEvents.data.labels = data.top_events.map(e => formatEventName(e.name));
+                charts.topEvents.data.datasets[0].data = data.top_events.map(e => e.count);
+                charts.topEvents.update();
+            }
+        }
+
+        async function fetchUsers() {
+            const res = await fetch(`${API_BASE}/v1/stats/users?days=${currentDays}`);
+            const data = await res.json();
+
+            // Update tier chart
+            if (data.users_by_tier && data.users_by_tier.length > 0) {
+                const tierMap = { free: 0, pro: 0, max: 0 };
+                data.users_by_tier.forEach(t => {
+                    const tier = (t.tier || 'free').toLowerCase();
+                    if (tier in tierMap) tierMap[tier] = parseInt(t.count);
+                });
+                charts.tier.data.datasets[0].data = [tierMap.free, tierMap.pro, tierMap.max];
+                charts.tier.update();
+            }
+
+            // Update engagement chart
+            if (data.engagement_buckets && data.engagement_buckets.length > 0) {
+                charts.engagement.data.labels = data.engagement_buckets.map(b => b.bucket);
+                charts.engagement.data.datasets[0].data = data.engagement_buckets.map(b => parseInt(b.user_count));
+                charts.engagement.update();
+            }
+        }
+
+        async function fetchFeatures() {
+            const res = await fetch(`${API_BASE}/v1/stats/features?days=${currentDays}`);
+            const data = await res.json();
+
+            // Photos captured
+            const totalPhotos = data.photos_captured_by_day?.reduce((sum, d) => sum + parseInt(d.count), 0) || 0;
+            document.getElementById('photosCaptured').textContent = formatNumber(totalPhotos);
+            document.getElementById('photosChange').textContent = `Last ${currentDays} days`;
+
+            // Events chart (photos per day)
+            if (data.photos_captured_by_day && data.photos_captured_by_day.length > 0) {
+                const sorted = [...data.photos_captured_by_day].sort((a, b) => new Date(a.date) - new Date(b.date));
+                charts.events.data.labels = sorted.map(d => formatDate(d.date));
+                charts.events.data.datasets[0].data = sorted.map(d => parseInt(d.count));
+                charts.events.update();
+            }
+
+            // Schedule distribution
+            if (data.schedule_distribution && data.schedule_distribution.length > 0) {
+                charts.schedule.data.labels = data.schedule_distribution.map(s => s.schedule || 'Unknown');
+                charts.schedule.data.datasets[0].data = data.schedule_distribution.map(s => parseInt(s.count));
+                charts.schedule.update();
+            }
+
+            // Spam type distribution
+            if (data.spam_type_distribution && data.spam_type_distribution.length > 0) {
+                charts.spamType.data.labels = data.spam_type_distribution.map(s => s.spam_type || 'Unknown');
+                charts.spamType.data.datasets[0].data = data.spam_type_distribution.map(s => parseInt(s.count));
+                charts.spamType.update();
+            }
+        }
+
+        async function fetchFunnel() {
+            const res = await fetch(`${API_BASE}/v1/stats/funnel?days=${currentDays}`);
+            const data = await res.json();
+
+            const container = document.getElementById('funnelContainer');
+
+            if (!data.funnel || data.funnel.length === 0 || data.funnel[0].users === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📊</div>
+                        <div class="empty-state-text">No funnel data yet</div>
+                        <div class="empty-state-subtext">Data will appear once users start using the app</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const maxUsers = data.funnel[0].users;
+            container.innerHTML = data.funnel.map(step => {
+                const width = maxUsers > 0 ? (step.users / maxUsers * 100) : 0;
+                return `
+                    <div class="funnel-step">
+                        <div class="funnel-label">${formatEventName(step.step)}</div>
+                        <div class="funnel-bar-container">
+                            <div class="funnel-bar" style="width: ${width}%">
+                                <span class="funnel-value">${formatNumber(step.users)}</span>
+                            </div>
+                        </div>
+                        <div class="funnel-rate">${step.conversion_rate}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function fetchRealtime() {
+            const res = await fetch(`${API_BASE}/v1/stats/realtime`);
+            const data = await res.json();
+
+            document.getElementById('activeUsers').textContent = `${data.active_users} active users`;
+
+            const feed = document.getElementById('realtimeFeed');
+
+            if (!data.recent_events || data.recent_events.length === 0) {
+                feed.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📡</div>
+                        <div class="empty-state-text">Waiting for events...</div>
+                        <div class="empty-state-subtext">Events will appear here in real-time</div>
+                    </div>
+                `;
+                return;
+            }
+
+            feed.innerHTML = data.recent_events.map(event => {
+                const iconClass = getEventIconClass(event.name);
+                const icon = getEventIcon(event.name);
+                const time = new Date(event.timestamp).toLocaleTimeString();
+                const device = event.device_id?.substring(0, 8) || 'Unknown';
+
+                return `
+                    <div class="event-item">
+                        <div class="event-icon ${iconClass}">${icon}</div>
+                        <div class="event-details">
+                            <div class="event-name">${formatEventName(event.name)}</div>
+                            <div class="event-meta">Device: ${device}...</div>
+                        </div>
+                        <div class="event-time">${time}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Utility functions
+        function formatNumber(num) {
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount);
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function formatEventName(name) {
+            return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function getEventIconClass(name) {
+            if (name.includes('camera') || name.includes('photo')) return 'camera';
+            if (name.includes('gallery')) return 'gallery';
+            if (name.includes('purchase') || name.includes('subscription') || name.includes('paywall')) return 'subscription';
+            if (name.includes('error')) return 'error';
+            if (name.includes('feature')) return 'feature';
+            return 'lifecycle';
+        }
+
+        function getEventIcon(name) {
+            if (name.includes('camera') || name.includes('photo')) return '📸';
+            if (name.includes('gallery')) return '🖼️';
+            if (name.includes('purchase')) return '💰';
+            if (name.includes('subscription')) return '⭐';
+            if (name.includes('paywall')) return '🔒';
+            if (name.includes('error')) return '❌';
+            if (name.includes('feature')) return '✨';
+            if (name.includes('app_opened')) return '📱';
+            return '📊';
+        }
+    </script>
+</body>
+</html>
