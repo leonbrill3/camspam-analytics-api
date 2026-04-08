@@ -101,6 +101,31 @@ app.get('/migrate', async (req, res) => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_rc_events_user ON revenuecat_events(app_user_id);`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_rc_events_created ON revenuecat_events(created_at);`);
 
+      // Create user profiles table (for paying subscribers)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS user_profiles (
+          id SERIAL PRIMARY KEY,
+          device_id VARCHAR(100) NOT NULL UNIQUE,
+          rc_user_id VARCHAR(255),
+          email VARCHAR(255),
+          email_verified BOOLEAN DEFAULT FALSE,
+          phone VARCHAR(50),
+          phone_verified BOOLEAN DEFAULT FALSE,
+          display_name VARCHAR(100),
+          subscription_tier VARCHAR(20),
+          opted_in_marketing BOOLEAN DEFAULT FALSE,
+          opted_in_product_updates BOOLEAN DEFAULT TRUE,
+          opted_in_receipts BOOLEAN DEFAULT TRUE,
+          preferred_contact VARCHAR(20) DEFAULT 'email',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      // Create indexes for user profiles
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_profiles_email ON user_profiles(email);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_profiles_rc_user ON user_profiles(rc_user_id);`);
+
       res.json({ success: true, message: 'Migration completed' });
     } finally {
       client.release();
@@ -108,6 +133,139 @@ app.get('/migrate', async (req, res) => {
   } catch (error) {
     console.error('Migration error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================
+// USER PROFILE API
+// ============================================
+
+// POST /v1/profile - Create or update user profile (for paying subscribers)
+app.post('/v1/profile', async (req, res) => {
+  try {
+    const {
+      device_id,
+      rc_user_id,
+      email,
+      phone,
+      display_name,
+      subscription_tier,
+      opted_in_marketing,
+      opted_in_product_updates,
+      opted_in_receipts,
+      preferred_contact
+    } = req.body;
+
+    if (!device_id) {
+      return res.status(400).json({ error: 'device_id required' });
+    }
+
+    // Upsert profile
+    const result = await pool.query(`
+      INSERT INTO user_profiles (
+        device_id, rc_user_id, email, phone, display_name,
+        subscription_tier, opted_in_marketing, opted_in_product_updates,
+        opted_in_receipts, preferred_contact, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+      ON CONFLICT (device_id) DO UPDATE SET
+        rc_user_id = COALESCE(EXCLUDED.rc_user_id, user_profiles.rc_user_id),
+        email = COALESCE(EXCLUDED.email, user_profiles.email),
+        phone = COALESCE(EXCLUDED.phone, user_profiles.phone),
+        display_name = COALESCE(EXCLUDED.display_name, user_profiles.display_name),
+        subscription_tier = COALESCE(EXCLUDED.subscription_tier, user_profiles.subscription_tier),
+        opted_in_marketing = COALESCE(EXCLUDED.opted_in_marketing, user_profiles.opted_in_marketing),
+        opted_in_product_updates = COALESCE(EXCLUDED.opted_in_product_updates, user_profiles.opted_in_product_updates),
+        opted_in_receipts = COALESCE(EXCLUDED.opted_in_receipts, user_profiles.opted_in_receipts),
+        preferred_contact = COALESCE(EXCLUDED.preferred_contact, user_profiles.preferred_contact),
+        updated_at = NOW()
+      RETURNING *
+    `, [
+      device_id,
+      rc_user_id || null,
+      email || null,
+      phone || null,
+      display_name || null,
+      subscription_tier || null,
+      opted_in_marketing ?? null,
+      opted_in_product_updates ?? null,
+      opted_in_receipts ?? null,
+      preferred_contact || null
+    ]);
+
+    res.json({ success: true, profile: result.rows[0] });
+  } catch (error) {
+    console.error('Error saving profile:', error);
+    res.status(500).json({ error: 'Failed to save profile' });
+  }
+});
+
+// GET /v1/profile/:device_id - Get user profile
+app.get('/v1/profile/:device_id', async (req, res) => {
+  try {
+    const { device_id } = req.params;
+
+    const result = await pool.query(
+      'SELECT * FROM user_profiles WHERE device_id = $1',
+      [device_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    res.json({ profile: result.rows[0] });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
+
+// DELETE /v1/profile/:device_id - Delete user profile (GDPR compliance)
+app.delete('/v1/profile/:device_id', async (req, res) => {
+  try {
+    const { device_id } = req.params;
+
+    await pool.query('DELETE FROM user_profiles WHERE device_id = $1', [device_id]);
+
+    res.json({ success: true, message: 'Profile deleted' });
+  } catch (error) {
+    console.error('Error deleting profile:', error);
+    res.status(500).json({ error: 'Failed to delete profile' });
+  }
+});
+
+// GET /v1/stats/subscribers - Dashboard: subscriber profiles overview
+app.get('/v1/stats/subscribers', async (req, res) => {
+  try {
+    const [
+      totalProfiles,
+      byTier,
+      withEmail,
+      withPhone,
+      marketingOptIn
+    ] = await Promise.all([
+      pool.query('SELECT COUNT(*) as count FROM user_profiles'),
+      pool.query(`
+        SELECT subscription_tier, COUNT(*) as count
+        FROM user_profiles
+        WHERE subscription_tier IS NOT NULL
+        GROUP BY subscription_tier
+      `),
+      pool.query('SELECT COUNT(*) as count FROM user_profiles WHERE email IS NOT NULL'),
+      pool.query('SELECT COUNT(*) as count FROM user_profiles WHERE phone IS NOT NULL'),
+      pool.query('SELECT COUNT(*) as count FROM user_profiles WHERE opted_in_marketing = true')
+    ]);
+
+    res.json({
+      total_profiles: parseInt(totalProfiles.rows[0].count),
+      by_tier: byTier.rows,
+      with_email: parseInt(withEmail.rows[0].count),
+      with_phone: parseInt(withPhone.rows[0].count),
+      marketing_opt_in: parseInt(marketingOptIn.rows[0].count)
+    });
+  } catch (error) {
+    console.error('Error fetching subscriber stats:', error);
+    res.status(500).json({ error: 'Failed to fetch subscriber stats' });
   }
 });
 
