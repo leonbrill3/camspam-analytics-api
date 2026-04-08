@@ -5,9 +5,16 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const { Pool } = require('pg');
 const path = require('path');
+const twilio = require('twilio');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Twilio configuration for SMS verification
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
+const TWILIO_VERIFY_SERVICE_SID = process.env.TWILIO_VERIFY_SERVICE_SID;
 
 // Database connection
 const pool = new Pool({
@@ -231,6 +238,191 @@ app.delete('/v1/profile/:device_id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting profile:', error);
     res.status(500).json({ error: 'Failed to delete profile' });
+  }
+});
+
+// ============================================
+// PHONE VERIFICATION API (Twilio Verify)
+// ============================================
+
+// POST /v1/verify/send - Send SMS verification code
+app.post('/v1/verify/send', async (req, res) => {
+  try {
+    const { phone, device_id } = req.body;
+
+    if (!phone || !device_id) {
+      return res.status(400).json({ error: 'phone and device_id required' });
+    }
+
+    // Check if Twilio is configured
+    if (!twilioClient || !TWILIO_VERIFY_SERVICE_SID) {
+      console.error('Twilio not configured');
+      return res.status(503).json({ error: 'SMS verification not available' });
+    }
+
+    // Normalize phone number (ensure it has country code)
+    let normalizedPhone = phone.replace(/[^\d+]/g, '');
+    if (!normalizedPhone.startsWith('+')) {
+      // Assume US if no country code
+      normalizedPhone = '+1' + normalizedPhone.replace(/^1/, '');
+    }
+
+    // Send verification code via Twilio Verify
+    const verification = await twilioClient.verify.v2
+      .services(TWILIO_VERIFY_SERVICE_SID)
+      .verifications.create({
+        to: normalizedPhone,
+        channel: 'sms'
+      });
+
+    console.log(`📱 Verification sent to ${normalizedPhone}: ${verification.status}`);
+
+    // Store phone number in profile (unverified)
+    await pool.query(`
+      INSERT INTO user_profiles (device_id, phone, phone_verified, updated_at)
+      VALUES ($1, $2, false, NOW())
+      ON CONFLICT (device_id) DO UPDATE SET
+        phone = $2,
+        phone_verified = false,
+        updated_at = NOW()
+    `, [device_id, normalizedPhone]);
+
+    res.json({
+      success: true,
+      status: verification.status,
+      phone: normalizedPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1 (***) ***-$4') // Mask for privacy
+    });
+  } catch (error) {
+    console.error('Error sending verification:', error);
+
+    // Handle specific Twilio errors
+    if (error.code === 60200) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+    if (error.code === 60203) {
+      return res.status(429).json({ error: 'Too many verification attempts. Please wait.' });
+    }
+
+    res.status(500).json({ error: 'Failed to send verification code' });
+  }
+});
+
+// POST /v1/verify/check - Verify SMS code
+app.post('/v1/verify/check', async (req, res) => {
+  try {
+    const { phone, code, device_id } = req.body;
+
+    if (!phone || !code || !device_id) {
+      return res.status(400).json({ error: 'phone, code, and device_id required' });
+    }
+
+    // Check if Twilio is configured
+    if (!twilioClient || !TWILIO_VERIFY_SERVICE_SID) {
+      return res.status(503).json({ error: 'SMS verification not available' });
+    }
+
+    // Normalize phone number
+    let normalizedPhone = phone.replace(/[^\d+]/g, '');
+    if (!normalizedPhone.startsWith('+')) {
+      normalizedPhone = '+1' + normalizedPhone.replace(/^1/, '');
+    }
+
+    // Verify the code with Twilio
+    const verificationCheck = await twilioClient.verify.v2
+      .services(TWILIO_VERIFY_SERVICE_SID)
+      .verificationChecks.create({
+        to: normalizedPhone,
+        code: code
+      });
+
+    if (verificationCheck.status === 'approved') {
+      // Update profile to mark phone as verified
+      const result = await pool.query(`
+        UPDATE user_profiles
+        SET phone_verified = true, phone = $1, updated_at = NOW()
+        WHERE device_id = $2
+        RETURNING *
+      `, [normalizedPhone, device_id]);
+
+      console.log(`✅ Phone verified for device ${device_id}`);
+
+      res.json({
+        success: true,
+        verified: true,
+        profile: result.rows[0] || null
+      });
+    } else {
+      res.json({
+        success: false,
+        verified: false,
+        status: verificationCheck.status,
+        error: 'Invalid verification code'
+      });
+    }
+  } catch (error) {
+    console.error('Error checking verification:', error);
+
+    // Handle specific Twilio errors
+    if (error.code === 60202) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' });
+    }
+    if (error.code === 20404) {
+      return res.status(400).json({ error: 'Verification not found. Please request a new code.' });
+    }
+
+    res.status(500).json({ error: 'Failed to verify code' });
+  }
+});
+
+// POST /v1/verify/resend - Resend verification code
+app.post('/v1/verify/resend', async (req, res) => {
+  try {
+    const { device_id } = req.body;
+
+    if (!device_id) {
+      return res.status(400).json({ error: 'device_id required' });
+    }
+
+    // Get phone from profile
+    const profileResult = await pool.query(
+      'SELECT phone FROM user_profiles WHERE device_id = $1',
+      [device_id]
+    );
+
+    if (profileResult.rows.length === 0 || !profileResult.rows[0].phone) {
+      return res.status(404).json({ error: 'No phone number on file' });
+    }
+
+    const phone = profileResult.rows[0].phone;
+
+    // Check if Twilio is configured
+    if (!twilioClient || !TWILIO_VERIFY_SERVICE_SID) {
+      return res.status(503).json({ error: 'SMS verification not available' });
+    }
+
+    // Send new verification code
+    const verification = await twilioClient.verify.v2
+      .services(TWILIO_VERIFY_SERVICE_SID)
+      .verifications.create({
+        to: phone,
+        channel: 'sms'
+      });
+
+    console.log(`📱 Verification resent to ${phone}: ${verification.status}`);
+
+    res.json({
+      success: true,
+      status: verification.status,
+      phone: phone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1 (***) ***-$4')
+    });
+  } catch (error) {
+    console.error('Error resending verification:', error);
+
+    if (error.code === 60203) {
+      return res.status(429).json({ error: 'Too many verification attempts. Please wait.' });
+    }
+
+    res.status(500).json({ error: 'Failed to resend verification code' });
   }
 });
 
