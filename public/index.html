@@ -14,43 +14,143 @@
             box-sizing: border-box;
         }
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-            min-height: 100vh;
-            color: #fff;
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --bg-card: rgba(255,255,255,0.05);
+            --border-color: rgba(255,255,255,0.1);
+            --text-primary: #fff;
+            --text-secondary: rgba(255,255,255,0.7);
+            --text-muted: rgba(255,255,255,0.5);
+            --accent-blue: #60a5fa;
+            --accent-purple: #a855f7;
+            --accent-green: #10b981;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
-        .dashboard {
-            max-width: 1600px;
-            margin: 0 auto;
-            padding: 24px;
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            background: rgba(0,0,0,0.3);
+            border-right: 1px solid var(--border-color);
+            padding: 24px 16px;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 12px;
+            margin-bottom: 32px;
+        }
+
+        .sidebar-logo-icon {
+            font-size: 28px;
+        }
+
+        .sidebar-logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--gradient-primary);
+            color: var(--text-primary);
+        }
+
+        .nav-item-icon {
+            font-size: 18px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .nav-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            padding: 0 16px;
+            margin-bottom: 12px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 240px;
+            padding: 24px 32px;
         }
 
         /* Header */
-        .header {
+        .page-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 32px;
-            padding-bottom: 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
         }
 
-        .header h1 {
+        .page-title {
             font-size: 28px;
             font-weight: 700;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            display: flex;
-            align-items: center;
-            gap: 12px;
         }
 
-        .header h1::before {
-            content: "📸";
-            -webkit-text-fill-color: initial;
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
 
         .header-controls {
@@ -61,37 +161,37 @@
 
         .time-filter {
             display: flex;
-            background: rgba(255,255,255,0.05);
+            background: var(--bg-card);
             border-radius: 12px;
             padding: 4px;
+            border: 1px solid var(--border-color);
         }
 
         .time-filter button {
             background: none;
             border: none;
-            color: rgba(255,255,255,0.6);
+            color: var(--text-secondary);
             padding: 8px 16px;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             transition: all 0.2s;
         }
 
         .time-filter button.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
+            background: var(--gradient-primary);
+            color: var(--text-primary);
         }
 
         .time-filter button:hover:not(.active) {
-            color: #fff;
             background: rgba(255,255,255,0.1);
         }
 
         .refresh-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-primary);
             border: none;
-            color: #fff;
+            color: var(--text-primary);
             padding: 10px 20px;
             border-radius: 10px;
             cursor: pointer;
@@ -108,38 +208,18 @@
             box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
 
-        .refresh-btn.loading {
-            opacity: 0.7;
-            pointer-events: none;
-        }
-
-        .refresh-btn.loading::before {
-            content: "";
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Live indicator */
         .live-indicator {
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 14px;
-            color: rgba(255,255,255,0.6);
+            font-size: 13px;
+            color: var(--text-muted);
         }
 
         .live-dot {
             width: 8px;
             height: 8px;
-            background: #10b981;
+            background: var(--accent-green);
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
@@ -152,17 +232,17 @@
         /* Stats Grid */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 32px;
         }
 
         .stat-card {
-            background: rgba(255,255,255,0.05);
+            background: var(--bg-card);
             backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 24px;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--border-color);
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
@@ -172,28 +252,33 @@
         }
 
         .stat-card.revenue {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.08) 100%);
             border-color: rgba(16, 185, 129, 0.3);
         }
-
         .stat-card.users {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.08) 100%);
             border-color: rgba(59, 130, 246, 0.3);
         }
-
         .stat-card.events {
-            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(139, 92, 246, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(139, 92, 246, 0.08) 100%);
             border-color: rgba(168, 85, 247, 0.3);
         }
-
         .stat-card.photos {
-            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2) 0%, rgba(234, 88, 12, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 88, 12, 0.08) 100%);
             border-color: rgba(249, 115, 22, 0.3);
+        }
+        .stat-card.conversion {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.15) 0%, rgba(219, 39, 119, 0.08) 100%);
+            border-color: rgba(236, 72, 153, 0.3);
+        }
+        .stat-card.retention {
+            background: linear-gradient(135deg, rgba(20, 184, 166, 0.15) 0%, rgba(13, 148, 136, 0.08) 100%);
+            border-color: rgba(20, 184, 166, 0.3);
         }
 
         .stat-label {
-            font-size: 13px;
-            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             margin-bottom: 8px;
@@ -203,9 +288,9 @@
         }
 
         .stat-value {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 700;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .stat-change {
@@ -215,13 +300,9 @@
             gap: 4px;
         }
 
-        .stat-change.positive {
-            color: #10b981;
-        }
-
-        .stat-change.negative {
-            color: #ef4444;
-        }
+        .stat-change.positive { color: var(--accent-green); }
+        .stat-change.negative { color: var(--accent-red); }
+        .stat-change.neutral { color: var(--text-muted); }
 
         /* Charts Grid */
         .charts-grid {
@@ -231,56 +312,50 @@
             margin-bottom: 32px;
         }
 
-        @media (max-width: 1200px) {
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
+        @media (max-width: 1400px) {
+            .charts-grid { grid-template-columns: 1fr; }
         }
 
         .chart-card {
-            background: rgba(255,255,255,0.05);
+            background: var(--bg-card);
             backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 24px;
-            border: 1px solid rgba(255,255,255,0.1);
+            border: 1px solid var(--border-color);
         }
 
-        .chart-card.full-width {
-            grid-column: span 2;
-        }
+        .chart-card.full-width { grid-column: span 2; }
+        .chart-card.third-width { grid-column: span 1; }
 
-        @media (max-width: 1200px) {
-            .chart-card.full-width {
-                grid-column: span 1;
-            }
+        @media (max-width: 1400px) {
+            .chart-card.full-width { grid-column: span 1; }
         }
 
         .chart-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start;
             margin-bottom: 20px;
         }
 
         .chart-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
         }
 
         .chart-subtitle {
-            font-size: 13px;
-            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            color: var(--text-muted);
             margin-top: 4px;
         }
 
         .chart-container {
             position: relative;
-            height: 300px;
+            height: 280px;
         }
 
-        .chart-container.small {
-            height: 200px;
-        }
+        .chart-container.small { height: 200px; }
+        .chart-container.large { height: 350px; }
 
         /* Funnel */
         .funnel-container {
@@ -297,8 +372,8 @@
 
         .funnel-bar-container {
             flex: 1;
-            height: 40px;
-            background: rgba(255,255,255,0.05);
+            height: 44px;
+            background: rgba(255,255,255,0.03);
             border-radius: 8px;
             overflow: hidden;
             position: relative;
@@ -306,51 +381,53 @@
 
         .funnel-bar {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-primary);
             border-radius: 8px;
             transition: width 0.8s ease-out;
             display: flex;
             align-items: center;
             padding-left: 16px;
+            min-width: 80px;
         }
 
         .funnel-label {
-            width: 140px;
+            width: 130px;
             font-size: 13px;
-            color: rgba(255,255,255,0.8);
+            color: var(--text-secondary);
         }
 
         .funnel-value {
             font-size: 14px;
             font-weight: 600;
-            color: #fff;
-            white-space: nowrap;
+            color: var(--text-primary);
         }
 
         .funnel-rate {
-            width: 80px;
+            width: 70px;
             text-align: right;
             font-size: 13px;
-            color: rgba(255,255,255,0.6);
+            font-weight: 500;
         }
+
+        .funnel-rate.good { color: var(--accent-green); }
+        .funnel-rate.ok { color: var(--accent-orange); }
+        .funnel-rate.bad { color: var(--accent-red); }
 
         /* Real-time Feed */
         .realtime-feed {
-            max-height: 400px;
+            max-height: 450px;
             overflow-y: auto;
         }
 
         .realtime-feed::-webkit-scrollbar {
             width: 6px;
         }
-
         .realtime-feed::-webkit-scrollbar-track {
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.03);
             border-radius: 3px;
         }
-
         .realtime-feed::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.15);
             border-radius: 3px;
         }
 
@@ -358,25 +435,27 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            padding: 12px;
-            border-radius: 8px;
+            padding: 12px 16px;
+            border-radius: 10px;
             margin-bottom: 8px;
-            background: rgba(255,255,255,0.03);
-            transition: background 0.2s;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid transparent;
+            transition: all 0.2s;
         }
 
         .event-item:hover {
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.05);
+            border-color: var(--border-color);
         }
 
         .event-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 18px;
         }
 
         .event-icon.camera { background: rgba(249, 115, 22, 0.2); }
@@ -386,25 +465,10 @@
         .event-icon.feature { background: rgba(236, 72, 153, 0.2); }
         .event-icon.error { background: rgba(239, 68, 68, 0.2); }
 
-        .event-details {
-            flex: 1;
-        }
-
-        .event-name {
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 2px;
-        }
-
-        .event-meta {
-            font-size: 12px;
-            color: rgba(255,255,255,0.5);
-        }
-
-        .event-time {
-            font-size: 12px;
-            color: rgba(255,255,255,0.4);
-        }
+        .event-details { flex: 1; }
+        .event-name { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+        .event-meta { font-size: 12px; color: var(--text-muted); }
+        .event-time { font-size: 12px; color: var(--text-muted); }
 
         /* Tables */
         .data-table {
@@ -412,32 +476,30 @@
             border-collapse: collapse;
         }
 
-        .data-table th,
-        .data-table td {
-            padding: 12px 16px;
+        .data-table th, .data-table td {
+            padding: 14px 16px;
             text-align: left;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .data-table th {
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: rgba(255,255,255,0.5);
+            color: var(--text-muted);
             font-weight: 600;
+            background: rgba(255,255,255,0.02);
         }
 
-        .data-table td {
-            font-size: 14px;
-        }
+        .data-table td { font-size: 14px; }
 
         .data-table tr:hover td {
-            background: rgba(255,255,255,0.03);
+            background: rgba(255,255,255,0.02);
         }
 
         .badge {
             display: inline-block;
-            padding: 4px 10px;
+            padding: 4px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 500;
@@ -447,240 +509,820 @@
         .badge.pro { background: rgba(59, 130, 246, 0.3); color: #60a5fa; }
         .badge.max { background: rgba(168, 85, 247, 0.3); color: #c084fc; }
 
+        /* Retention Table */
+        .retention-table {
+            overflow-x: auto;
+        }
+
+        .retention-cell {
+            padding: 8px 12px;
+            text-align: center;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .retention-cell.high { background: rgba(16, 185, 129, 0.3); color: #34d399; }
+        .retention-cell.medium { background: rgba(234, 179, 8, 0.3); color: #fbbf24; }
+        .retention-cell.low { background: rgba(239, 68, 68, 0.3); color: #f87171; }
+
         /* Empty State */
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: rgba(255,255,255,0.5);
+            color: var(--text-muted);
         }
 
-        .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
+        .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
+        .empty-state-text { font-size: 16px; margin-bottom: 8px; }
+        .empty-state-subtext { font-size: 14px; color: var(--text-muted); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-card);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
         }
 
-        .empty-state-text {
-            font-size: 16px;
-            margin-bottom: 8px;
-        }
-
-        .empty-state-subtext {
-            font-size: 14px;
-            color: rgba(255,255,255,0.3);
-        }
-
-        /* Loading skeleton */
-        .skeleton {
-            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+        .tab {
+            padding: 10px 20px;
             border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            background: none;
         }
 
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+        .tab:hover { background: rgba(255,255,255,0.05); }
+        .tab.active {
+            background: var(--gradient-primary);
+            color: var(--text-primary);
+        }
+
+        /* KPI Row */
+        .kpi-row {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .kpi-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .kpi-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
+        .kpi-value { font-size: 24px; font-weight: 700; }
+
+        /* Page Sections */
+        .page-section {
+            display: none;
+        }
+
+        .page-section.active {
+            display: block;
+        }
+
+        /* Info Cards */
+        .info-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .info-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .info-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+
+        .info-item-label { color: var(--text-secondary); }
+        .info-item-value { font-weight: 500; }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient-primary);
+            border-radius: 4px;
+            transition: width 0.5s ease-out;
         }
 
         /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; }
+        }
+
         @media (max-width: 768px) {
-            .dashboard {
-                padding: 16px;
-            }
-
-            .header {
-                flex-direction: column;
-                gap: 16px;
-                align-items: flex-start;
-            }
-
-            .stats-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-
-            .stat-value {
-                font-size: 28px;
-            }
+            .main-content { padding: 16px; }
+            .page-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .stat-value { font-size: 24px; }
         }
     </style>
 </head>
 <body>
-    <div class="dashboard">
-        <!-- Header -->
-        <header class="header">
-            <h1>CamSpam Analytics</h1>
-            <div class="header-controls">
-                <div class="live-indicator">
-                    <span class="live-dot"></span>
-                    <span id="lastUpdate">Updating...</span>
-                </div>
-                <div class="time-filter">
-                    <button class="active" data-days="7">7D</button>
-                    <button data-days="30">30D</button>
-                    <button data-days="90">90D</button>
-                </div>
-                <button class="refresh-btn" onclick="refreshAll()">
-                    <span>Refresh</span>
-                </button>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <span class="sidebar-logo-icon">📸</span>
+                <span class="sidebar-logo-text">CamSpam</span>
             </div>
-        </header>
 
-        <!-- Stats Cards -->
-        <div class="stats-grid">
-            <div class="stat-card users">
-                <div class="stat-label">👥 Total Users</div>
-                <div class="stat-value" id="totalUsers">-</div>
-                <div class="stat-change positive" id="usersChange">Loading...</div>
-            </div>
-            <div class="stat-card events">
-                <div class="stat-label">📊 Total Events</div>
-                <div class="stat-value" id="totalEvents">-</div>
-                <div class="stat-change positive" id="eventsChange">Loading...</div>
-            </div>
-            <div class="stat-card photos">
-                <div class="stat-label">📸 Photos Captured</div>
-                <div class="stat-value" id="photosCaptured">-</div>
-                <div class="stat-change positive" id="photosChange">Loading...</div>
-            </div>
-            <div class="stat-card revenue">
-                <div class="stat-label">💰 Revenue</div>
-                <div class="stat-value" id="totalRevenue">$0</div>
-                <div class="stat-change positive" id="revenueChange">Loading...</div>
-            </div>
-        </div>
+            <nav class="sidebar-nav">
+                <div class="nav-item active" data-page="overview">
+                    <span class="nav-item-icon">📊</span>
+                    <span>Overview</span>
+                </div>
+                <div class="nav-item" data-page="acquisition">
+                    <span class="nav-item-icon">📈</span>
+                    <span>Acquisition</span>
+                </div>
+                <div class="nav-item" data-page="engagement">
+                    <span class="nav-item-icon">⚡</span>
+                    <span>Engagement</span>
+                </div>
+                <div class="nav-item" data-page="monetization">
+                    <span class="nav-item-icon">💰</span>
+                    <span>Monetization</span>
+                </div>
+                <div class="nav-item" data-page="product">
+                    <span class="nav-item-icon">📱</span>
+                    <span>Product Usage</span>
+                </div>
+                <div class="nav-item" data-page="realtime">
+                    <span class="nav-item-icon">🔴</span>
+                    <span>Real-Time</span>
+                </div>
 
-        <!-- Charts Row 1 -->
-        <div class="charts-grid">
-            <!-- Daily Active Users -->
-            <div class="chart-card">
-                <div class="chart-header">
+                <div class="nav-section">
+                    <div class="nav-section-title">Integrations</div>
+                    <div class="nav-item" data-page="revenuecat">
+                        <span class="nav-item-icon">💳</span>
+                        <span>RevenueCat</span>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- ==================== OVERVIEW PAGE ==================== -->
+            <section class="page-section active" id="page-overview">
+                <header class="page-header">
                     <div>
-                        <div class="chart-title">Daily Active Users</div>
-                        <div class="chart-subtitle">Unique devices per day</div>
+                        <h1 class="page-title">Executive Overview</h1>
+                        <p class="page-subtitle">Key metrics at a glance</p>
                     </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="dauChart"></canvas>
-                </div>
-            </div>
+                    <div class="header-controls">
+                        <div class="live-indicator">
+                            <span class="live-dot"></span>
+                            <span id="lastUpdate">Updating...</span>
+                        </div>
+                        <div class="time-filter">
+                            <button data-days="7" class="active">7D</button>
+                            <button data-days="30">30D</button>
+                            <button data-days="90">90D</button>
+                        </div>
+                        <button class="refresh-btn" onclick="refreshAll()">
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                </header>
 
-            <!-- Events Over Time -->
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-title">Events Over Time</div>
-                        <div class="chart-subtitle">Total events per day</div>
+                <!-- Top Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card users">
+                        <div class="stat-label">👥 Total Users</div>
+                        <div class="stat-value" id="totalUsers">-</div>
+                        <div class="stat-change neutral" id="usersChange">Loading...</div>
+                    </div>
+                    <div class="stat-card events">
+                        <div class="stat-label">📊 Total Events</div>
+                        <div class="stat-value" id="totalEvents">-</div>
+                        <div class="stat-change neutral" id="eventsChange">Loading...</div>
+                    </div>
+                    <div class="stat-card photos">
+                        <div class="stat-label">📸 Photos Captured</div>
+                        <div class="stat-value" id="photosCaptured">-</div>
+                        <div class="stat-change neutral" id="photosChange">Loading...</div>
+                    </div>
+                    <div class="stat-card revenue">
+                        <div class="stat-label">💰 Revenue</div>
+                        <div class="stat-value" id="totalRevenue">$0</div>
+                        <div class="stat-change neutral" id="revenueChange">Loading...</div>
+                    </div>
+                    <div class="stat-card conversion">
+                        <div class="stat-label">🎯 Conversion Rate</div>
+                        <div class="stat-value" id="conversionRate">0%</div>
+                        <div class="stat-change neutral">Paywall → Purchase</div>
+                    </div>
+                    <div class="stat-card retention">
+                        <div class="stat-label">🔄 D7 Retention</div>
+                        <div class="stat-value" id="d7Retention">-</div>
+                        <div class="stat-change neutral">Week 1 retention</div>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <canvas id="eventsChart"></canvas>
-                </div>
-            </div>
 
-            <!-- Conversion Funnel -->
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-title">Conversion Funnel</div>
-                        <div class="chart-subtitle">User journey from app open to purchase</div>
+                <!-- Charts Row 1 -->
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Daily Active Users</div>
+                                <div class="chart-subtitle">Unique devices per day</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="dauChart"></canvas>
+                        </div>
                     </div>
-                </div>
-                <div class="funnel-container" id="funnelContainer">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📊</div>
-                        <div class="empty-state-text">No funnel data yet</div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Top Events -->
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-title">Top Events</div>
-                        <div class="chart-subtitle">Most frequent events</div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Revenue Over Time</div>
+                                <div class="chart-subtitle">Daily revenue</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
                     </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="topEventsChart"></canvas>
-                </div>
-            </div>
 
-            <!-- Delete Schedule Distribution -->
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-title">Delete Schedules</div>
-                        <div class="chart-subtitle">Distribution of auto-delete settings</div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Conversion Funnel</div>
+                                <div class="chart-subtitle">User journey to purchase</div>
+                            </div>
+                        </div>
+                        <div class="funnel-container" id="funnelContainer">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📊</div>
+                                <div class="empty-state-text">No funnel data yet</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="scheduleChart"></canvas>
-                </div>
-            </div>
 
-            <!-- Spam Type Distribution -->
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-title">Spam Categories</div>
-                        <div class="chart-subtitle">Types of photos captured</div>
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Top Events</div>
+                                <div class="chart-subtitle">Most frequent events</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="topEventsChart"></canvas>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <canvas id="spamTypeChart"></canvas>
-                </div>
-            </div>
 
-            <!-- Users by Tier -->
-            <div class="chart-card">
-                <div class="chart-header">
-                    <div>
-                        <div class="chart-title">Users by Subscription</div>
-                        <div class="chart-subtitle">Free vs Pro vs Max users</div>
+                <!-- Quick Info -->
+                <div class="info-row">
+                    <div class="info-card">
+                        <div class="info-card-title">📱 Platform Distribution</div>
+                        <div class="info-list" id="platformList">
+                            <div class="info-item">
+                                <span class="info-item-label">iOS</span>
+                                <span class="info-item-value">100%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-title">⭐ Subscription Tiers</div>
+                        <div class="chart-container small">
+                            <canvas id="tierChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-title">🏆 Top Features</div>
+                        <div class="info-list" id="topFeatures">
+                            <div class="info-item">
+                                <span class="info-item-label">Photo Capture</span>
+                                <span class="info-item-value">-</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-container">
-                    <canvas id="tierChart"></canvas>
-                </div>
-            </div>
+            </section>
 
-            <!-- Session Duration -->
-            <div class="chart-card">
-                <div class="chart-header">
+            <!-- ==================== ACQUISITION PAGE ==================== -->
+            <section class="page-section" id="page-acquisition">
+                <header class="page-header">
                     <div>
-                        <div class="chart-title">User Engagement</div>
-                        <div class="chart-subtitle">Sessions per user</div>
+                        <h1 class="page-title">Acquisition & Retention</h1>
+                        <p class="page-subtitle">User growth and retention metrics</p>
                     </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="engagementChart"></canvas>
-                </div>
-            </div>
-        </div>
+                </header>
 
-        <!-- Real-time Events -->
-        <div class="charts-grid">
-            <div class="chart-card full-width">
-                <div class="chart-header">
+                <div class="stats-grid">
+                    <div class="stat-card users">
+                        <div class="stat-label">🆕 New Users</div>
+                        <div class="stat-value" id="newUsers">-</div>
+                        <div class="stat-change neutral">Last 7 days</div>
+                    </div>
+                    <div class="stat-card retention">
+                        <div class="stat-label">📅 D1 Retention</div>
+                        <div class="stat-value" id="d1Retention">-</div>
+                        <div class="stat-change neutral">Day 1 return rate</div>
+                    </div>
+                    <div class="stat-card retention">
+                        <div class="stat-label">📅 D7 Retention</div>
+                        <div class="stat-value" id="d7RetentionAcq">-</div>
+                        <div class="stat-change neutral">Week 1 return rate</div>
+                    </div>
+                    <div class="stat-card retention">
+                        <div class="stat-label">📅 D30 Retention</div>
+                        <div class="stat-value" id="d30Retention">-</div>
+                        <div class="stat-change neutral">Month 1 return rate</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">New Users Over Time</div>
+                                <div class="chart-subtitle">First-time app opens per day</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="newUsersChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Retention Cohorts</div>
+                                <div class="chart-subtitle">Users returning after first use</div>
+                            </div>
+                        </div>
+                        <div class="retention-table" id="retentionTable">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Cohort</th>
+                                        <th>Day 1</th>
+                                        <th>Day 3</th>
+                                        <th>Day 7</th>
+                                        <th>Day 14</th>
+                                        <th>Day 30</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="retentionBody">
+                                    <tr><td colspan="6" class="empty-state-text">No retention data yet</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Onboarding Funnel</div>
+                                <div class="chart-subtitle">First-time user experience</div>
+                            </div>
+                        </div>
+                        <div class="funnel-container" id="onboardingFunnel">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📊</div>
+                                <div class="empty-state-text">Tracking onboarding flow...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Device Models</div>
+                                <div class="chart-subtitle">Most common devices</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="devicesChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== ENGAGEMENT PAGE ==================== -->
+            <section class="page-section" id="page-engagement">
+                <header class="page-header">
                     <div>
-                        <div class="chart-title">Real-time Event Feed</div>
-                        <div class="chart-subtitle">Last 50 events from the past hour</div>
+                        <h1 class="page-title">Engagement</h1>
+                        <p class="page-subtitle">How users interact with the app</p>
                     </div>
-                    <div class="live-indicator">
-                        <span class="live-dot"></span>
-                        <span id="activeUsers">0 active users</span>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card events">
+                        <div class="stat-label">⏱️ Avg Session</div>
+                        <div class="stat-value" id="avgSession">-</div>
+                        <div class="stat-change neutral">Duration in minutes</div>
+                    </div>
+                    <div class="stat-card photos">
+                        <div class="stat-label">📸 Photos/User</div>
+                        <div class="stat-value" id="photosPerUser">-</div>
+                        <div class="stat-change neutral">Average per user</div>
+                    </div>
+                    <div class="stat-card users">
+                        <div class="stat-label">🔄 Sessions/User</div>
+                        <div class="stat-value" id="sessionsPerUser">-</div>
+                        <div class="stat-change neutral">Avg sessions per user</div>
+                    </div>
+                    <div class="stat-card conversion">
+                        <div class="stat-label">📱 Screen Views</div>
+                        <div class="stat-value" id="screenViews">-</div>
+                        <div class="stat-change neutral">Total screen views</div>
                     </div>
                 </div>
-                <div class="realtime-feed" id="realtimeFeed">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📡</div>
-                        <div class="empty-state-text">Waiting for events...</div>
-                        <div class="empty-state-subtext">Events will appear here in real-time</div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Sessions by Engagement</div>
+                                <div class="chart-subtitle">User session frequency distribution</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="engagementChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Session Duration Distribution</div>
+                                <div class="chart-subtitle">How long users spend in app</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="sessionDurationChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card full-width">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Events Over Time</div>
+                                <div class="chart-subtitle">Total events per day</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="eventsTimeChart"></canvas>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </section>
+
+            <!-- ==================== MONETIZATION PAGE ==================== -->
+            <section class="page-section" id="page-monetization">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Monetization</h1>
+                        <p class="page-subtitle">Revenue and subscription metrics</p>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card revenue">
+                        <div class="stat-label">💵 Total Revenue</div>
+                        <div class="stat-value" id="totalRevenueMon">$0</div>
+                        <div class="stat-change neutral" id="revenueChangeMon">Loading...</div>
+                    </div>
+                    <div class="stat-card revenue">
+                        <div class="stat-label">📊 MRR</div>
+                        <div class="stat-value" id="mrr">$0</div>
+                        <div class="stat-change neutral">Monthly Recurring</div>
+                    </div>
+                    <div class="stat-card conversion">
+                        <div class="stat-label">🎯 Trial Conversion</div>
+                        <div class="stat-value" id="trialConversion">-</div>
+                        <div class="stat-change neutral">Trial to paid</div>
+                    </div>
+                    <div class="stat-card users">
+                        <div class="stat-label">💎 ARPU</div>
+                        <div class="stat-value" id="arpu">$0</div>
+                        <div class="stat-change neutral">Avg revenue per user</div>
+                    </div>
+                    <div class="stat-card users">
+                        <div class="stat-label">🏆 ARPPU</div>
+                        <div class="stat-value" id="arppu">$0</div>
+                        <div class="stat-change neutral">Avg per paying user</div>
+                    </div>
+                    <div class="stat-card retention">
+                        <div class="stat-label">📈 LTV</div>
+                        <div class="stat-value" id="ltv">$0</div>
+                        <div class="stat-change neutral">Lifetime value</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Revenue Over Time</div>
+                                <div class="chart-subtitle">Daily revenue trend</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="revenueTimeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Purchase Funnel</div>
+                                <div class="chart-subtitle">Conversion through purchase flow</div>
+                            </div>
+                        </div>
+                        <div class="funnel-container" id="purchaseFunnel">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">💰</div>
+                                <div class="empty-state-text">No purchase data yet</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Revenue by Plan</div>
+                                <div class="chart-subtitle">Pro vs Max breakdown</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="revenuePlanChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Subscribers Over Time</div>
+                                <div class="chart-subtitle">Active subscriber count</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="subscribersChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== PRODUCT PAGE ==================== -->
+            <section class="page-section" id="page-product">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Product Usage</h1>
+                        <p class="page-subtitle">Feature adoption and usage patterns</p>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card photos">
+                        <div class="stat-label">📸 Total Photos</div>
+                        <div class="stat-value" id="totalPhotos">-</div>
+                        <div class="stat-change neutral">All time</div>
+                    </div>
+                    <div class="stat-card events">
+                        <div class="stat-label">🗑️ Photos Deleted</div>
+                        <div class="stat-value" id="totalDeleted">-</div>
+                        <div class="stat-change neutral">Auto + Manual</div>
+                    </div>
+                    <div class="stat-card conversion">
+                        <div class="stat-label">⚡ Auto Delete Rate</div>
+                        <div class="stat-value" id="autoDeleteRate">-</div>
+                        <div class="stat-change neutral">vs Manual delete</div>
+                    </div>
+                    <div class="stat-card users">
+                        <div class="stat-label">🔄 Active Features</div>
+                        <div class="stat-value" id="activeFeatures">-</div>
+                        <div class="stat-change neutral">Features in use</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Photos Captured Over Time</div>
+                                <div class="chart-subtitle">Daily photo capture trend</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="photosCapturedChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Delete Schedule Distribution</div>
+                                <div class="chart-subtitle">Most used auto-delete settings</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="scheduleChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Spam Type Distribution</div>
+                                <div class="chart-subtitle">Categories of photos taken</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="spamTypeChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Feature Usage</div>
+                                <div class="chart-subtitle">Feature adoption rates</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="featureUsageChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== REALTIME PAGE ==================== -->
+            <section class="page-section" id="page-realtime">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Real-Time</h1>
+                        <p class="page-subtitle">Live activity feed</p>
+                    </div>
+                    <div class="header-controls">
+                        <div class="live-indicator">
+                            <span class="live-dot"></span>
+                            <span id="activeUsersRT">0 active users</span>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card users">
+                        <div class="stat-label">👥 Active Now</div>
+                        <div class="stat-value" id="activeNow">0</div>
+                        <div class="stat-change neutral">Last hour</div>
+                    </div>
+                    <div class="stat-card events">
+                        <div class="stat-label">📊 Events/Min</div>
+                        <div class="stat-value" id="eventsPerMin">0</div>
+                        <div class="stat-change neutral">Current rate</div>
+                    </div>
+                    <div class="stat-card photos">
+                        <div class="stat-label">📸 Photos Today</div>
+                        <div class="stat-value" id="photosToday">0</div>
+                        <div class="stat-change neutral">Captured today</div>
+                    </div>
+                    <div class="stat-card revenue">
+                        <div class="stat-label">💰 Revenue Today</div>
+                        <div class="stat-value" id="revenueToday">$0</div>
+                        <div class="stat-change neutral">Today's total</div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Events Per Minute</div>
+                                <div class="chart-subtitle">Last 60 minutes</div>
+                            </div>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="eventsPerMinChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Live Event Feed</div>
+                                <div class="chart-subtitle">Last 50 events</div>
+                            </div>
+                        </div>
+                        <div class="realtime-feed" id="realtimeFeed">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📡</div>
+                                <div class="empty-state-text">Waiting for events...</div>
+                                <div class="empty-state-subtext">Events will appear here in real-time</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== REVENUECAT PAGE ==================== -->
+            <section class="page-section" id="page-revenuecat">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">RevenueCat Integration</h1>
+                        <p class="page-subtitle">Subscription data from RevenueCat webhooks</p>
+                    </div>
+                </header>
+
+                <div class="info-row">
+                    <div class="info-card">
+                        <div class="info-card-title">🔗 Webhook Status</div>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <span class="info-item-label">Endpoint</span>
+                                <span class="info-item-value" id="webhookEndpoint">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-item-label">Status</span>
+                                <span class="info-item-value" id="webhookStatus">Not configured</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-item-label">Last Event</span>
+                                <span class="info-item-value" id="lastWebhook">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-card-title">📋 Setup Instructions</div>
+                        <div class="info-list" style="font-size: 13px; color: var(--text-secondary);">
+                            <p>1. Go to RevenueCat Dashboard → Project Settings → Webhooks</p>
+                            <p style="margin-top: 8px;">2. Add webhook URL:</p>
+                            <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0; word-break: break-all;" id="webhookUrl">Loading...</code>
+                            <p style="margin-top: 8px;">3. Select all event types</p>
+                            <p style="margin-top: 8px;">4. Save and test webhook</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Recent RevenueCat Events</div>
+                            <div class="chart-subtitle">Subscription lifecycle events</div>
+                        </div>
+                    </div>
+                    <div class="realtime-feed" id="rcEventsFeed">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💳</div>
+                            <div class="empty-state-text">No RevenueCat events yet</div>
+                            <div class="empty-state-subtext">Configure webhooks to see subscription events</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script>
@@ -688,6 +1330,7 @@
         const API_BASE = window.location.origin;
         let currentDays = 7;
         let charts = {};
+        let currentPage = 'overview';
 
         // Chart.js defaults
         Chart.defaults.color = 'rgba(255,255,255,0.7)';
@@ -696,8 +1339,13 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
+            initNavigation();
             initCharts();
             refreshAll();
+
+            // Set webhook URL
+            document.getElementById('webhookUrl').textContent = `${API_BASE}/webhooks/revenuecat`;
+            document.getElementById('webhookEndpoint').textContent = '/webhooks/revenuecat';
 
             // Auto-refresh every 30 seconds
             setInterval(refreshAll, 30000);
@@ -713,385 +1361,490 @@
             });
         });
 
+        function initNavigation() {
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const page = item.dataset.page;
+                    if (page) {
+                        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                        item.classList.add('active');
+
+                        document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+                        document.getElementById(`page-${page}`).classList.add('active');
+
+                        currentPage = page;
+
+                        // Refresh page-specific data
+                        if (page === 'realtime') fetchRealtime();
+                        if (page === 'revenuecat') fetchRevenueCatEvents();
+                    }
+                });
+            });
+        }
+
         function initCharts() {
-            // DAU Chart
+            const chartOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            };
+
+            const doughnutOptions = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { padding: 12, font: { size: 11 } } } }
+            };
+
+            // Overview Charts
             charts.dau = new Chart(document.getElementById('dauChart'), {
                 type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Users',
-                        data: [],
-                        borderColor: '#60a5fa',
-                        backgroundColor: 'rgba(96, 165, 250, 0.1)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        pointBackgroundColor: '#60a5fa'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { grid: { display: false } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Users', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true, tension: 0.4 }] },
+                options: chartOptions
             });
 
-            // Events Chart
-            charts.events = new Chart(document.getElementById('eventsChart'), {
+            charts.revenue = new Chart(document.getElementById('revenueChart'), {
                 type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Events',
-                        data: [],
-                        backgroundColor: 'rgba(168, 85, 247, 0.6)',
-                        borderColor: '#a855f7',
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { grid: { display: false } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Revenue', data: [], backgroundColor: 'rgba(16, 185, 129, 0.6)', borderRadius: 4 }] },
+                options: chartOptions
             });
 
-            // Top Events Chart
             charts.topEvents = new Chart(document.getElementById('topEventsChart'), {
                 type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Count',
-                        data: [],
-                        backgroundColor: [
-                            'rgba(102, 126, 234, 0.7)',
-                            'rgba(118, 75, 162, 0.7)',
-                            'rgba(168, 85, 247, 0.7)',
-                            'rgba(236, 72, 153, 0.7)',
-                            'rgba(249, 115, 22, 0.7)',
-                            'rgba(16, 185, 129, 0.7)',
-                            'rgba(59, 130, 246, 0.7)',
-                            'rgba(239, 68, 68, 0.7)',
-                            'rgba(234, 179, 8, 0.7)',
-                            'rgba(20, 184, 166, 0.7)'
-                        ],
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        y: { grid: { display: false } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Count', data: [], backgroundColor: ['rgba(102, 126, 234, 0.7)', 'rgba(118, 75, 162, 0.7)', 'rgba(168, 85, 247, 0.7)', 'rgba(236, 72, 153, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(59, 130, 246, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(234, 179, 8, 0.7)', 'rgba(20, 184, 166, 0.7)'], borderRadius: 4 }] },
+                options: { ...chartOptions, indexAxis: 'y' }
             });
 
-            // Schedule Chart
-            charts.schedule = new Chart(document.getElementById('scheduleChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            'rgba(239, 68, 68, 0.8)',
-                            'rgba(249, 115, 22, 0.8)',
-                            'rgba(234, 179, 8, 0.8)',
-                            'rgba(16, 185, 129, 0.8)',
-                            'rgba(59, 130, 246, 0.8)',
-                            'rgba(168, 85, 247, 0.8)'
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { padding: 16 } }
-                    }
-                }
-            });
-
-            // Spam Type Chart
-            charts.spamType = new Chart(document.getElementById('spamTypeChart'), {
-                type: 'doughnut',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        data: [],
-                        backgroundColor: [
-                            'rgba(102, 126, 234, 0.8)',
-                            'rgba(236, 72, 153, 0.8)',
-                            'rgba(249, 115, 22, 0.8)',
-                            'rgba(16, 185, 129, 0.8)',
-                            'rgba(168, 85, 247, 0.8)'
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { padding: 16 } }
-                    }
-                }
-            });
-
-            // Tier Chart
             charts.tier = new Chart(document.getElementById('tierChart'), {
                 type: 'doughnut',
-                data: {
-                    labels: ['Free', 'Pro', 'Max'],
-                    datasets: [{
-                        data: [0, 0, 0],
-                        backgroundColor: [
-                            'rgba(107, 114, 128, 0.8)',
-                            'rgba(59, 130, 246, 0.8)',
-                            'rgba(168, 85, 247, 0.8)'
-                        ],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'right', labels: { padding: 16 } }
-                    }
-                }
+                data: { labels: ['Free', 'Pro', 'Max'], datasets: [{ data: [0, 0, 0], backgroundColor: ['rgba(107, 114, 128, 0.8)', 'rgba(59, 130, 246, 0.8)', 'rgba(168, 85, 247, 0.8)'], borderWidth: 0 }] },
+                options: doughnutOptions
             });
 
-            // Engagement Chart
+            // Acquisition Charts
+            charts.newUsers = new Chart(document.getElementById('newUsersChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'New Users', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }] },
+                options: chartOptions
+            });
+
+            charts.devices = new Chart(document.getElementById('devicesChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Devices', data: [], backgroundColor: 'rgba(168, 85, 247, 0.6)', borderRadius: 4 }] },
+                options: { ...chartOptions, indexAxis: 'y' }
+            });
+
+            // Engagement Charts
             charts.engagement = new Chart(document.getElementById('engagementChart'), {
                 type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [{
-                        label: 'Users',
-                        data: [],
-                        backgroundColor: 'rgba(16, 185, 129, 0.6)',
-                        borderColor: '#10b981',
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { grid: { display: false } }
-                    }
-                }
+                data: { labels: [], datasets: [{ label: 'Users', data: [], backgroundColor: 'rgba(16, 185, 129, 0.6)', borderRadius: 4 }] },
+                options: chartOptions
+            });
+
+            charts.sessionDuration = new Chart(document.getElementById('sessionDurationChart'), {
+                type: 'bar',
+                data: { labels: ['< 30s', '30s-1m', '1-5m', '5-15m', '15m+'], datasets: [{ label: 'Sessions', data: [0, 0, 0, 0, 0], backgroundColor: 'rgba(59, 130, 246, 0.6)', borderRadius: 4 }] },
+                options: chartOptions
+            });
+
+            charts.eventsTime = new Chart(document.getElementById('eventsTimeChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Events', data: [], borderColor: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.1)', fill: true, tension: 0.4 }] },
+                options: chartOptions
+            });
+
+            // Monetization Charts
+            charts.revenueTime = new Chart(document.getElementById('revenueTimeChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Revenue', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 }] },
+                options: chartOptions
+            });
+
+            charts.revenuePlan = new Chart(document.getElementById('revenuePlanChart'), {
+                type: 'doughnut',
+                data: { labels: ['Pro Monthly', 'Pro Yearly', 'Max Monthly', 'Max Yearly'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(37, 99, 235, 0.8)', 'rgba(168, 85, 247, 0.8)', 'rgba(139, 92, 246, 0.8)'], borderWidth: 0 }] },
+                options: doughnutOptions
+            });
+
+            charts.subscribers = new Chart(document.getElementById('subscribersChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Subscribers', data: [], borderColor: '#ec4899', backgroundColor: 'rgba(236, 72, 153, 0.1)', fill: true, tension: 0.4 }] },
+                options: chartOptions
+            });
+
+            // Product Charts
+            charts.photosCaptured = new Chart(document.getElementById('photosCapturedChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Photos', data: [], borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 }] },
+                options: chartOptions
+            });
+
+            charts.schedule = new Chart(document.getElementById('scheduleChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(239, 68, 68, 0.8)', 'rgba(249, 115, 22, 0.8)', 'rgba(234, 179, 8, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(59, 130, 246, 0.8)', 'rgba(168, 85, 247, 0.8)'], borderWidth: 0 }] },
+                options: doughnutOptions
+            });
+
+            charts.spamType = new Chart(document.getElementById('spamTypeChart'), {
+                type: 'doughnut',
+                data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(102, 126, 234, 0.8)', 'rgba(236, 72, 153, 0.8)', 'rgba(249, 115, 22, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(168, 85, 247, 0.8)'], borderWidth: 0 }] },
+                options: doughnutOptions
+            });
+
+            charts.featureUsage = new Chart(document.getElementById('featureUsageChart'), {
+                type: 'bar',
+                data: { labels: [], datasets: [{ label: 'Usage', data: [], backgroundColor: 'rgba(236, 72, 153, 0.6)', borderRadius: 4 }] },
+                options: { ...chartOptions, indexAxis: 'y' }
+            });
+
+            // Real-time Charts
+            charts.eventsPerMin = new Chart(document.getElementById('eventsPerMinChart'), {
+                type: 'line',
+                data: { labels: [], datasets: [{ label: 'Events', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true, tension: 0.4, pointRadius: 0 }] },
+                options: chartOptions
             });
         }
 
         async function refreshAll() {
-            const btn = document.querySelector('.refresh-btn');
-            btn.classList.add('loading');
-
             try {
                 await Promise.all([
                     fetchOverview(),
                     fetchUsers(),
                     fetchFeatures(),
                     fetchFunnel(),
-                    fetchRealtime()
+                    fetchRealtime(),
+                    fetchRetention()
                 ]);
 
                 document.getElementById('lastUpdate').textContent = `Updated ${new Date().toLocaleTimeString()}`;
             } catch (error) {
                 console.error('Error refreshing data:', error);
             }
-
-            btn.classList.remove('loading');
         }
 
         async function fetchOverview() {
-            const res = await fetch(`${API_BASE}/v1/stats/overview?days=${currentDays}`);
-            const data = await res.json();
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/overview?days=${currentDays}`);
+                const data = await res.json();
 
-            document.getElementById('totalUsers').textContent = formatNumber(data.total_users);
-            document.getElementById('totalEvents').textContent = formatNumber(data.total_events);
-            document.getElementById('totalRevenue').textContent = formatCurrency(data.revenue?.total || 0);
+                // Stats
+                document.getElementById('totalUsers').textContent = formatNumber(data.total_users);
+                document.getElementById('totalEvents').textContent = formatNumber(data.total_events);
+                document.getElementById('totalRevenue').textContent = formatCurrency(data.revenue?.total || 0);
+                document.getElementById('totalRevenueMon').textContent = formatCurrency(data.revenue?.total || 0);
 
-            document.getElementById('usersChange').textContent = `${data.total_users} unique devices`;
-            document.getElementById('eventsChange').textContent = `Last ${currentDays} days`;
-            document.getElementById('revenueChange').textContent = `${data.revenue?.purchases || 0} purchases`;
+                document.getElementById('usersChange').textContent = `${data.total_users} unique devices`;
+                document.getElementById('eventsChange').textContent = `Last ${currentDays} days`;
+                document.getElementById('revenueChange').textContent = `${data.revenue?.purchases || 0} purchases`;
+                document.getElementById('revenueChangeMon').textContent = `${data.revenue?.purchases || 0} purchases`;
 
-            // Update DAU chart
-            if (data.daily_active_users && data.daily_active_users.length > 0) {
-                const sorted = [...data.daily_active_users].sort((a, b) => new Date(a.date) - new Date(b.date));
-                charts.dau.data.labels = sorted.map(d => formatDate(d.date));
-                charts.dau.data.datasets[0].data = sorted.map(d => d.count);
-                charts.dau.update();
-            }
+                // DAU Chart
+                if (data.daily_active_users?.length > 0) {
+                    const sorted = [...data.daily_active_users].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    charts.dau.data.labels = sorted.map(d => formatDate(d.date));
+                    charts.dau.data.datasets[0].data = sorted.map(d => d.count);
+                    charts.dau.update();
+                }
 
-            // Update top events chart
-            if (data.top_events && data.top_events.length > 0) {
-                charts.topEvents.data.labels = data.top_events.map(e => formatEventName(e.name));
-                charts.topEvents.data.datasets[0].data = data.top_events.map(e => e.count);
-                charts.topEvents.update();
+                // Top Events Chart
+                if (data.top_events?.length > 0) {
+                    charts.topEvents.data.labels = data.top_events.map(e => formatEventName(e.name));
+                    charts.topEvents.data.datasets[0].data = data.top_events.map(e => e.count);
+                    charts.topEvents.update();
+                }
+            } catch (e) {
+                console.error('fetchOverview error:', e);
             }
         }
 
         async function fetchUsers() {
-            const res = await fetch(`${API_BASE}/v1/stats/users?days=${currentDays}`);
-            const data = await res.json();
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/users?days=${currentDays}`);
+                const data = await res.json();
 
-            // Update tier chart
-            if (data.users_by_tier && data.users_by_tier.length > 0) {
-                const tierMap = { free: 0, pro: 0, max: 0 };
-                data.users_by_tier.forEach(t => {
-                    const tier = (t.tier || 'free').toLowerCase();
-                    if (tier in tierMap) tierMap[tier] = parseInt(t.count);
-                });
-                charts.tier.data.datasets[0].data = [tierMap.free, tierMap.pro, tierMap.max];
-                charts.tier.update();
-            }
+                // Tier chart
+                if (data.users_by_tier?.length > 0) {
+                    const tierMap = { free: 0, pro: 0, max: 0 };
+                    data.users_by_tier.forEach(t => {
+                        const tier = (t.tier || 'free').toLowerCase();
+                        if (tier in tierMap) tierMap[tier] = parseInt(t.count);
+                    });
+                    charts.tier.data.datasets[0].data = [tierMap.free, tierMap.pro, tierMap.max];
+                    charts.tier.update();
+                }
 
-            // Update engagement chart
-            if (data.engagement_buckets && data.engagement_buckets.length > 0) {
-                charts.engagement.data.labels = data.engagement_buckets.map(b => b.bucket);
-                charts.engagement.data.datasets[0].data = data.engagement_buckets.map(b => parseInt(b.user_count));
-                charts.engagement.update();
+                // Engagement chart
+                if (data.engagement_buckets?.length > 0) {
+                    charts.engagement.data.labels = data.engagement_buckets.map(b => b.bucket);
+                    charts.engagement.data.datasets[0].data = data.engagement_buckets.map(b => parseInt(b.user_count));
+                    charts.engagement.update();
+                }
+
+                // Avg session
+                if (data.avg_session_duration_seconds) {
+                    const mins = Math.round(data.avg_session_duration_seconds / 60);
+                    document.getElementById('avgSession').textContent = `${mins}m`;
+                }
+
+                // New users
+                if (data.new_users_by_day?.length > 0) {
+                    const newUsersTotal = data.new_users_by_day.reduce((sum, d) => sum + parseInt(d.count), 0);
+                    document.getElementById('newUsers').textContent = formatNumber(newUsersTotal);
+
+                    const sorted = [...data.new_users_by_day].sort((a, b) => new Date(a.first_seen) - new Date(b.first_seen));
+                    charts.newUsers.data.labels = sorted.map(d => formatDate(d.first_seen));
+                    charts.newUsers.data.datasets[0].data = sorted.map(d => parseInt(d.count));
+                    charts.newUsers.update();
+                }
+            } catch (e) {
+                console.error('fetchUsers error:', e);
             }
         }
 
         async function fetchFeatures() {
-            const res = await fetch(`${API_BASE}/v1/stats/features?days=${currentDays}`);
-            const data = await res.json();
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/features?days=${currentDays}`);
+                const data = await res.json();
 
-            // Photos captured
-            const totalPhotos = data.photos_captured_by_day?.reduce((sum, d) => sum + parseInt(d.count), 0) || 0;
-            document.getElementById('photosCaptured').textContent = formatNumber(totalPhotos);
-            document.getElementById('photosChange').textContent = `Last ${currentDays} days`;
+                // Photos captured
+                const totalPhotos = data.photos_captured_by_day?.reduce((sum, d) => sum + parseInt(d.count), 0) || 0;
+                document.getElementById('photosCaptured').textContent = formatNumber(totalPhotos);
+                document.getElementById('totalPhotos').textContent = formatNumber(totalPhotos);
+                document.getElementById('photosChange').textContent = `Last ${currentDays} days`;
 
-            // Events chart (photos per day)
-            if (data.photos_captured_by_day && data.photos_captured_by_day.length > 0) {
-                const sorted = [...data.photos_captured_by_day].sort((a, b) => new Date(a.date) - new Date(b.date));
-                charts.events.data.labels = sorted.map(d => formatDate(d.date));
-                charts.events.data.datasets[0].data = sorted.map(d => parseInt(d.count));
-                charts.events.update();
-            }
+                // Photos chart
+                if (data.photos_captured_by_day?.length > 0) {
+                    const sorted = [...data.photos_captured_by_day].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    charts.photosCaptured.data.labels = sorted.map(d => formatDate(d.date));
+                    charts.photosCaptured.data.datasets[0].data = sorted.map(d => parseInt(d.count));
+                    charts.photosCaptured.update();
 
-            // Schedule distribution
-            if (data.schedule_distribution && data.schedule_distribution.length > 0) {
-                charts.schedule.data.labels = data.schedule_distribution.map(s => s.schedule || 'Unknown');
-                charts.schedule.data.datasets[0].data = data.schedule_distribution.map(s => parseInt(s.count));
-                charts.schedule.update();
-            }
+                    charts.eventsTime.data.labels = sorted.map(d => formatDate(d.date));
+                    charts.eventsTime.data.datasets[0].data = sorted.map(d => parseInt(d.count));
+                    charts.eventsTime.update();
+                }
 
-            // Spam type distribution
-            if (data.spam_type_distribution && data.spam_type_distribution.length > 0) {
-                charts.spamType.data.labels = data.spam_type_distribution.map(s => s.spam_type || 'Unknown');
-                charts.spamType.data.datasets[0].data = data.spam_type_distribution.map(s => parseInt(s.count));
-                charts.spamType.update();
+                // Schedule distribution
+                if (data.schedule_distribution?.length > 0) {
+                    charts.schedule.data.labels = data.schedule_distribution.map(s => s.schedule || 'Unknown');
+                    charts.schedule.data.datasets[0].data = data.schedule_distribution.map(s => parseInt(s.count));
+                    charts.schedule.update();
+                }
+
+                // Spam type distribution
+                if (data.spam_type_distribution?.length > 0) {
+                    charts.spamType.data.labels = data.spam_type_distribution.map(s => s.spam_type || 'Unknown');
+                    charts.spamType.data.datasets[0].data = data.spam_type_distribution.map(s => parseInt(s.count));
+                    charts.spamType.update();
+                }
+
+                // Photos deleted
+                if (data.photos_deleted?.length > 0) {
+                    const totalDeleted = data.photos_deleted.reduce((sum, d) => sum + parseInt(d.count), 0);
+                    document.getElementById('totalDeleted').textContent = formatNumber(totalDeleted);
+
+                    const autoDeleted = data.photos_deleted.find(d => d.was_manual === 'false')?.count || 0;
+                    const manualDeleted = data.photos_deleted.find(d => d.was_manual === 'true')?.count || 0;
+                    if (totalDeleted > 0) {
+                        document.getElementById('autoDeleteRate').textContent = Math.round(autoDeleted / totalDeleted * 100) + '%';
+                    }
+                }
+
+                // Feature usage
+                if (data.feature_usage?.length > 0) {
+                    charts.featureUsage.data.labels = data.feature_usage.map(f => f.feature || 'Unknown');
+                    charts.featureUsage.data.datasets[0].data = data.feature_usage.map(f => parseInt(f.enabled_count || 0));
+                    charts.featureUsage.update();
+
+                    document.getElementById('activeFeatures').textContent = data.feature_usage.length;
+                }
+            } catch (e) {
+                console.error('fetchFeatures error:', e);
             }
         }
 
         async function fetchFunnel() {
-            const res = await fetch(`${API_BASE}/v1/stats/funnel?days=${currentDays}`);
-            const data = await res.json();
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/funnel?days=${currentDays}`);
+                const data = await res.json();
 
-            const container = document.getElementById('funnelContainer');
+                renderFunnel('funnelContainer', data.funnel);
 
-            if (!data.funnel || data.funnel.length === 0 || data.funnel[0].users === 0) {
+                // Calculate conversion rate
+                if (data.funnel?.length >= 2) {
+                    const paywallStep = data.funnel.find(s => s.step === 'paywall_viewed');
+                    const purchaseStep = data.funnel.find(s => s.step === 'purchase_completed');
+                    if (paywallStep && purchaseStep && paywallStep.users > 0) {
+                        const rate = (purchaseStep.users / paywallStep.users * 100).toFixed(1);
+                        document.getElementById('conversionRate').textContent = rate + '%';
+                    }
+                }
+
+                // Purchase funnel (same data, different container)
+                renderFunnel('purchaseFunnel', data.funnel?.filter(s =>
+                    ['paywall_viewed', 'purchase_started', 'purchase_completed'].includes(s.step)
+                ));
+            } catch (e) {
+                console.error('fetchFunnel error:', e);
+            }
+        }
+
+        function renderFunnel(containerId, funnel) {
+            const container = document.getElementById(containerId);
+            if (!funnel || funnel.length === 0 || funnel[0].users === 0) {
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-state-icon">📊</div>
                         <div class="empty-state-text">No funnel data yet</div>
-                        <div class="empty-state-subtext">Data will appear once users start using the app</div>
                     </div>
                 `;
                 return;
             }
 
-            const maxUsers = data.funnel[0].users;
-            container.innerHTML = data.funnel.map(step => {
+            const maxUsers = funnel[0].users;
+            container.innerHTML = funnel.map(step => {
                 const width = maxUsers > 0 ? (step.users / maxUsers * 100) : 0;
+                const rate = parseFloat(step.conversion_rate);
+                const rateClass = rate >= 50 ? 'good' : rate >= 20 ? 'ok' : 'bad';
                 return `
                     <div class="funnel-step">
                         <div class="funnel-label">${formatEventName(step.step)}</div>
                         <div class="funnel-bar-container">
-                            <div class="funnel-bar" style="width: ${width}%">
+                            <div class="funnel-bar" style="width: ${Math.max(width, 10)}%">
                                 <span class="funnel-value">${formatNumber(step.users)}</span>
                             </div>
                         </div>
-                        <div class="funnel-rate">${step.conversion_rate}%</div>
+                        <div class="funnel-rate ${rateClass}">${step.conversion_rate}%</div>
                     </div>
                 `;
             }).join('');
         }
 
         async function fetchRealtime() {
-            const res = await fetch(`${API_BASE}/v1/stats/realtime`);
-            const data = await res.json();
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/realtime`);
+                const data = await res.json();
 
-            document.getElementById('activeUsers').textContent = `${data.active_users} active users`;
+                document.getElementById('activeUsersRT').textContent = `${data.active_users} active users`;
+                document.getElementById('activeNow').textContent = data.active_users;
 
-            const feed = document.getElementById('realtimeFeed');
+                // Events per minute
+                if (data.events_per_minute?.length > 0) {
+                    const eventsPerMin = data.events_per_minute.reduce((sum, e) => sum + parseInt(e.count), 0) / data.events_per_minute.length;
+                    document.getElementById('eventsPerMin').textContent = Math.round(eventsPerMin);
 
-            if (!data.recent_events || data.recent_events.length === 0) {
-                feed.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📡</div>
-                        <div class="empty-state-text">Waiting for events...</div>
-                        <div class="empty-state-subtext">Events will appear here in real-time</div>
-                    </div>
-                `;
-                return;
-            }
+                    const sorted = [...data.events_per_minute].sort((a, b) => new Date(a.minute) - new Date(b.minute));
+                    charts.eventsPerMin.data.labels = sorted.map(d => new Date(d.minute).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+                    charts.eventsPerMin.data.datasets[0].data = sorted.map(d => parseInt(d.count));
+                    charts.eventsPerMin.update();
+                }
 
-            feed.innerHTML = data.recent_events.map(event => {
-                const iconClass = getEventIconClass(event.name);
-                const icon = getEventIcon(event.name);
-                const time = new Date(event.timestamp).toLocaleTimeString();
-                const device = event.device_id?.substring(0, 8) || 'Unknown';
-
-                return `
-                    <div class="event-item">
-                        <div class="event-icon ${iconClass}">${icon}</div>
-                        <div class="event-details">
-                            <div class="event-name">${formatEventName(event.name)}</div>
-                            <div class="event-meta">Device: ${device}...</div>
+                // Recent events feed
+                const feed = document.getElementById('realtimeFeed');
+                if (!data.recent_events?.length) {
+                    feed.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📡</div>
+                            <div class="empty-state-text">Waiting for events...</div>
                         </div>
-                        <div class="event-time">${time}</div>
-                    </div>
-                `;
-            }).join('');
+                    `;
+                    return;
+                }
+
+                feed.innerHTML = data.recent_events.map(event => {
+                    const iconClass = getEventIconClass(event.name);
+                    const icon = getEventIcon(event.name);
+                    const time = new Date(event.timestamp).toLocaleTimeString();
+                    const device = event.device_id?.substring(0, 8) || 'Unknown';
+
+                    return `
+                        <div class="event-item">
+                            <div class="event-icon ${iconClass}">${icon}</div>
+                            <div class="event-details">
+                                <div class="event-name">${formatEventName(event.name)}</div>
+                                <div class="event-meta">Device: ${device}...</div>
+                            </div>
+                            <div class="event-time">${time}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('fetchRealtime error:', e);
+            }
+        }
+
+        async function fetchRetention() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/retention?days=${currentDays}`);
+                const data = await res.json();
+
+                if (data.d1_retention !== undefined) {
+                    document.getElementById('d1Retention').textContent = data.d1_retention + '%';
+                    document.getElementById('d7Retention').textContent = (data.d7_retention || '-') + '%';
+                    document.getElementById('d7RetentionAcq').textContent = (data.d7_retention || '-') + '%';
+                    document.getElementById('d30Retention').textContent = (data.d30_retention || '-') + '%';
+                }
+
+                if (data.cohorts?.length > 0) {
+                    const tbody = document.getElementById('retentionBody');
+                    tbody.innerHTML = data.cohorts.map(cohort => {
+                        return `
+                            <tr>
+                                <td>${cohort.cohort_date}</td>
+                                <td><span class="retention-cell ${getRetentionClass(cohort.d1)}">${cohort.d1}%</span></td>
+                                <td><span class="retention-cell ${getRetentionClass(cohort.d3)}">${cohort.d3}%</span></td>
+                                <td><span class="retention-cell ${getRetentionClass(cohort.d7)}">${cohort.d7}%</span></td>
+                                <td><span class="retention-cell ${getRetentionClass(cohort.d14)}">${cohort.d14}%</span></td>
+                                <td><span class="retention-cell ${getRetentionClass(cohort.d30)}">${cohort.d30}%</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                // Retention endpoint might not exist yet
+                console.log('Retention data not available yet');
+            }
+        }
+
+        async function fetchRevenueCatEvents() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/revenuecat-events`);
+                const data = await res.json();
+
+                if (data.events?.length > 0) {
+                    document.getElementById('webhookStatus').textContent = 'Active';
+                    document.getElementById('webhookStatus').style.color = 'var(--accent-green)';
+                    document.getElementById('lastWebhook').textContent = new Date(data.events[0].timestamp).toLocaleString();
+
+                    const feed = document.getElementById('rcEventsFeed');
+                    feed.innerHTML = data.events.map(event => `
+                        <div class="event-item">
+                            <div class="event-icon subscription">💳</div>
+                            <div class="event-details">
+                                <div class="event-name">${event.type}</div>
+                                <div class="event-meta">${event.product_id || 'N/A'} - ${event.app_user_id?.substring(0, 12) || 'Unknown'}...</div>
+                            </div>
+                            <div class="event-time">${new Date(event.timestamp).toLocaleTimeString()}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.log('RevenueCat events not available');
+            }
         }
 
         // Utility functions
         function formatNumber(num) {
             if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
             if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-            return num.toString();
+            return num?.toString() || '0';
         }
 
         function formatCurrency(amount) {
-            return new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-            }).format(amount);
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
         }
 
         function formatDate(dateStr) {
@@ -1100,28 +1853,34 @@
         }
 
         function formatEventName(name) {
-            return name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            return (name || '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         }
 
         function getEventIconClass(name) {
-            if (name.includes('camera') || name.includes('photo')) return 'camera';
-            if (name.includes('gallery')) return 'gallery';
-            if (name.includes('purchase') || name.includes('subscription') || name.includes('paywall')) return 'subscription';
-            if (name.includes('error')) return 'error';
-            if (name.includes('feature')) return 'feature';
+            if (name?.includes('camera') || name?.includes('photo')) return 'camera';
+            if (name?.includes('gallery')) return 'gallery';
+            if (name?.includes('purchase') || name?.includes('subscription') || name?.includes('paywall')) return 'subscription';
+            if (name?.includes('error')) return 'error';
+            if (name?.includes('feature')) return 'feature';
             return 'lifecycle';
         }
 
         function getEventIcon(name) {
-            if (name.includes('camera') || name.includes('photo')) return '📸';
-            if (name.includes('gallery')) return '🖼️';
-            if (name.includes('purchase')) return '💰';
-            if (name.includes('subscription')) return '⭐';
-            if (name.includes('paywall')) return '🔒';
-            if (name.includes('error')) return '❌';
-            if (name.includes('feature')) return '✨';
-            if (name.includes('app_opened')) return '📱';
+            if (name?.includes('camera') || name?.includes('photo')) return '📸';
+            if (name?.includes('gallery')) return '🖼️';
+            if (name?.includes('purchase')) return '💰';
+            if (name?.includes('subscription')) return '⭐';
+            if (name?.includes('paywall')) return '🔒';
+            if (name?.includes('error')) return '❌';
+            if (name?.includes('feature')) return '✨';
+            if (name?.includes('app_opened')) return '📱';
             return '📊';
+        }
+
+        function getRetentionClass(value) {
+            if (value >= 40) return 'high';
+            if (value >= 20) return 'medium';
+            return 'low';
         }
     </script>
 </body>

@@ -72,6 +72,35 @@ app.get('/migrate', async (req, res) => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_events_device_id ON events(device_id);`);
 
+      // Create RevenueCat webhook events table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS revenuecat_events (
+          id SERIAL PRIMARY KEY,
+          event_type VARCHAR(100) NOT NULL,
+          app_user_id VARCHAR(255),
+          original_app_user_id VARCHAR(255),
+          product_id VARCHAR(100),
+          entitlement_ids JSONB DEFAULT '[]',
+          period_type VARCHAR(50),
+          purchased_at TIMESTAMPTZ,
+          expiration_at TIMESTAMPTZ,
+          store VARCHAR(50),
+          environment VARCHAR(50),
+          is_trial_conversion BOOLEAN DEFAULT FALSE,
+          cancel_reason VARCHAR(100),
+          price DECIMAL(10, 2),
+          currency VARCHAR(10),
+          takehome_percentage DECIMAL(5, 2),
+          raw_payload JSONB,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      // Create indexes for RevenueCat events
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_rc_events_type ON revenuecat_events(event_type);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_rc_events_user ON revenuecat_events(app_user_id);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_rc_events_created ON revenuecat_events(created_at);`);
+
       res.json({ success: true, message: 'Migration completed' });
     } finally {
       client.release();
@@ -468,6 +497,341 @@ app.get('/v1/stats/realtime', async (req, res) => {
   } catch (error) {
     console.error('Error fetching realtime stats:', error);
     res.status(500).json({ error: 'Failed to fetch realtime stats' });
+  }
+});
+
+// GET /v1/stats/retention - Retention cohort analysis
+app.get('/v1/stats/retention', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    // Get cohort data: users who first appeared on each day and their return rates
+    const cohortQuery = await pool.query(`
+      WITH user_first_seen AS (
+        SELECT
+          device_id,
+          DATE(MIN(timestamp)) as cohort_date
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY device_id
+      ),
+      user_activity AS (
+        SELECT
+          e.device_id,
+          ufs.cohort_date,
+          DATE(e.timestamp) as activity_date,
+          DATE(e.timestamp) - ufs.cohort_date as days_since_install
+        FROM events e
+        JOIN user_first_seen ufs ON e.device_id = ufs.device_id
+        WHERE e.timestamp >= $1
+      )
+      SELECT
+        cohort_date,
+        COUNT(DISTINCT device_id) as cohort_size,
+        COUNT(DISTINCT CASE WHEN days_since_install = 1 THEN device_id END) as d1_retained,
+        COUNT(DISTINCT CASE WHEN days_since_install = 7 THEN device_id END) as d7_retained,
+        COUNT(DISTINCT CASE WHEN days_since_install = 30 THEN device_id END) as d30_retained
+      FROM user_activity
+      GROUP BY cohort_date
+      ORDER BY cohort_date DESC
+      LIMIT 14
+    `, [startDate.toISOString()]);
+
+    // Calculate overall retention rates
+    const overallRetention = await pool.query(`
+      WITH user_first_seen AS (
+        SELECT
+          device_id,
+          DATE(MIN(timestamp)) as cohort_date
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY device_id
+      ),
+      retention_data AS (
+        SELECT
+          ufs.device_id,
+          ufs.cohort_date,
+          MAX(DATE(e.timestamp) - ufs.cohort_date) as max_days_retained
+        FROM user_first_seen ufs
+        LEFT JOIN events e ON ufs.device_id = e.device_id
+        WHERE e.timestamp >= $1
+        GROUP BY ufs.device_id, ufs.cohort_date
+      )
+      SELECT
+        COUNT(DISTINCT device_id) as total_users,
+        COUNT(DISTINCT CASE WHEN max_days_retained >= 1 THEN device_id END) as d1_retained,
+        COUNT(DISTINCT CASE WHEN max_days_retained >= 7 THEN device_id END) as d7_retained,
+        COUNT(DISTINCT CASE WHEN max_days_retained >= 30 THEN device_id END) as d30_retained
+      FROM retention_data
+    `, [startDate.toISOString()]);
+
+    const total = parseInt(overallRetention.rows[0].total_users) || 1;
+    const d1 = parseInt(overallRetention.rows[0].d1_retained) || 0;
+    const d7 = parseInt(overallRetention.rows[0].d7_retained) || 0;
+    const d30 = parseInt(overallRetention.rows[0].d30_retained) || 0;
+
+    res.json({
+      cohorts: cohortQuery.rows.map(row => ({
+        date: row.cohort_date,
+        cohort_size: parseInt(row.cohort_size),
+        d1_retained: parseInt(row.d1_retained),
+        d7_retained: parseInt(row.d7_retained),
+        d30_retained: parseInt(row.d30_retained),
+        d1_rate: row.cohort_size > 0 ? (row.d1_retained / row.cohort_size * 100).toFixed(1) : '0.0',
+        d7_rate: row.cohort_size > 0 ? (row.d7_retained / row.cohort_size * 100).toFixed(1) : '0.0',
+        d30_rate: row.cohort_size > 0 ? (row.d30_retained / row.cohort_size * 100).toFixed(1) : '0.0'
+      })),
+      overall: {
+        total_users: total,
+        d1_retention: (d1 / total * 100).toFixed(1),
+        d7_retention: (d7 / total * 100).toFixed(1),
+        d30_retention: (d30 / total * 100).toFixed(1)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching retention:', error);
+    res.status(500).json({ error: 'Failed to fetch retention data' });
+  }
+});
+
+// ============================================
+// REVENUECAT WEBHOOKS
+// ============================================
+
+// POST /webhooks/revenuecat - Receive RevenueCat subscription events
+app.post('/webhooks/revenuecat', async (req, res) => {
+  try {
+    const { event } = req.body;
+
+    if (!event) {
+      return res.status(400).json({ error: 'Event required' });
+    }
+
+    // Extract relevant fields from RevenueCat webhook
+    const {
+      type,
+      app_user_id,
+      original_app_user_id,
+      product_id,
+      entitlement_ids,
+      period_type,
+      purchased_at_ms,
+      expiration_at_ms,
+      store,
+      environment,
+      is_trial_conversion,
+      cancel_reason,
+      price,
+      currency,
+      takehome_percentage
+    } = event;
+
+    // Store the webhook event
+    await pool.query(`
+      INSERT INTO revenuecat_events (
+        event_type, app_user_id, original_app_user_id, product_id,
+        entitlement_ids, period_type, purchased_at, expiration_at,
+        store, environment, is_trial_conversion, cancel_reason,
+        price, currency, takehome_percentage, raw_payload
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    `, [
+      type,
+      app_user_id,
+      original_app_user_id,
+      product_id,
+      JSON.stringify(entitlement_ids || []),
+      period_type,
+      purchased_at_ms ? new Date(purchased_at_ms) : null,
+      expiration_at_ms ? new Date(expiration_at_ms) : null,
+      store,
+      environment,
+      is_trial_conversion || false,
+      cancel_reason,
+      price,
+      currency,
+      takehome_percentage,
+      JSON.stringify(req.body)
+    ]);
+
+    console.log(`RevenueCat webhook received: ${type} for ${app_user_id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error processing RevenueCat webhook:', error);
+    res.status(500).json({ error: 'Failed to process webhook' });
+  }
+});
+
+// GET /v1/stats/revenuecat-events - Get RevenueCat events for dashboard
+app.get('/v1/stats/revenuecat-events', async (req, res) => {
+  try {
+    const { days = 30, limit = 100 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const [recentEvents, eventSummary, mrr, churnData] = await Promise.all([
+      // Recent RevenueCat events
+      pool.query(`
+        SELECT
+          event_type, app_user_id, product_id, price, currency,
+          period_type, store, environment, created_at
+        FROM revenuecat_events
+        WHERE created_at >= $1
+        ORDER BY created_at DESC
+        LIMIT $2
+      `, [startDate.toISOString(), parseInt(limit)]),
+
+      // Event type summary
+      pool.query(`
+        SELECT event_type, COUNT(*) as count
+        FROM revenuecat_events
+        WHERE created_at >= $1
+        GROUP BY event_type
+        ORDER BY count DESC
+      `, [startDate.toISOString()]),
+
+      // MRR calculation (simplified - sum of monthly equivalent revenue)
+      pool.query(`
+        SELECT
+          COALESCE(SUM(
+            CASE
+              WHEN period_type = 'MONTHLY' THEN price * (takehome_percentage / 100)
+              WHEN period_type = 'ANNUAL' THEN (price / 12) * (takehome_percentage / 100)
+              ELSE 0
+            END
+          ), 0) as mrr,
+          COUNT(DISTINCT app_user_id) as active_subscribers
+        FROM revenuecat_events
+        WHERE event_type IN ('INITIAL_PURCHASE', 'RENEWAL')
+        AND created_at >= NOW() - INTERVAL '30 days'
+      `),
+
+      // Churn events
+      pool.query(`
+        SELECT
+          DATE(created_at) as date,
+          COUNT(*) as churn_count
+        FROM revenuecat_events
+        WHERE event_type IN ('CANCELLATION', 'EXPIRATION')
+        AND created_at >= $1
+        GROUP BY DATE(created_at)
+        ORDER BY date DESC
+      `, [startDate.toISOString()])
+    ]);
+
+    res.json({
+      recent_events: recentEvents.rows,
+      event_summary: eventSummary.rows,
+      mrr: {
+        value: parseFloat(mrr.rows[0].mrr) || 0,
+        active_subscribers: parseInt(mrr.rows[0].active_subscribers) || 0
+      },
+      churn_by_day: churnData.rows
+    });
+  } catch (error) {
+    console.error('Error fetching RevenueCat events:', error);
+    res.status(500).json({ error: 'Failed to fetch RevenueCat events' });
+  }
+});
+
+// GET /v1/stats/acquisition - Attribution and acquisition analytics
+app.get('/v1/stats/acquisition', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const [
+      installsByDay,
+      installsBySource,
+      organicVsPaid,
+      deviceBreakdown,
+      geoBreakdown
+    ] = await Promise.all([
+      // New installs by day
+      pool.query(`
+        WITH first_events AS (
+          SELECT device_id, MIN(timestamp) as first_seen
+          FROM events
+          GROUP BY device_id
+        )
+        SELECT DATE(first_seen) as date, COUNT(*) as installs
+        FROM first_events
+        WHERE first_seen >= $1
+        GROUP BY DATE(first_seen)
+        ORDER BY date DESC
+      `, [startDate.toISOString()]),
+
+      // Installs by attribution source
+      pool.query(`
+        WITH first_events AS (
+          SELECT device_id, MIN(timestamp) as first_seen,
+                 (SELECT properties->>'source' FROM events e2
+                  WHERE e2.device_id = events.device_id
+                  AND e2.name = 'app_opened'
+                  ORDER BY timestamp LIMIT 1) as source
+          FROM events
+          GROUP BY device_id
+        )
+        SELECT COALESCE(source, 'organic') as source, COUNT(*) as installs
+        FROM first_events
+        WHERE first_seen >= $1
+        GROUP BY source
+        ORDER BY installs DESC
+      `, [startDate.toISOString()]),
+
+      // Organic vs Paid
+      pool.query(`
+        WITH first_events AS (
+          SELECT device_id, MIN(timestamp) as first_seen,
+                 (SELECT properties->>'is_organic' FROM events e2
+                  WHERE e2.device_id = events.device_id
+                  AND e2.name = 'app_opened'
+                  ORDER BY timestamp LIMIT 1) as is_organic
+          FROM events
+          GROUP BY device_id
+        )
+        SELECT
+          COUNT(CASE WHEN is_organic = 'true' OR is_organic IS NULL THEN 1 END) as organic,
+          COUNT(CASE WHEN is_organic = 'false' THEN 1 END) as paid
+        FROM first_events
+        WHERE first_seen >= $1
+      `, [startDate.toISOString()]),
+
+      // Device model breakdown
+      pool.query(`
+        SELECT device_model, COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE timestamp >= $1 AND device_model IS NOT NULL
+        GROUP BY device_model
+        ORDER BY users DESC
+        LIMIT 10
+      `, [startDate.toISOString()]),
+
+      // Geographic breakdown by locale/timezone
+      pool.query(`
+        SELECT
+          COALESCE(SPLIT_PART(locale, '_', 2), locale, 'Unknown') as country,
+          COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE timestamp >= $1 AND locale IS NOT NULL
+        GROUP BY country
+        ORDER BY users DESC
+        LIMIT 10
+      `, [startDate.toISOString()])
+    ]);
+
+    res.json({
+      installs_by_day: installsByDay.rows,
+      installs_by_source: installsBySource.rows,
+      organic_vs_paid: organicVsPaid.rows[0] || { organic: 0, paid: 0 },
+      device_breakdown: deviceBreakdown.rows,
+      geo_breakdown: geoBreakdown.rows
+    });
+  } catch (error) {
+    console.error('Error fetching acquisition stats:', error);
+    res.status(500).json({ error: 'Failed to fetch acquisition stats' });
   }
 });
 
