@@ -28,6 +28,25 @@ const limiter = rateLimit({
 });
 app.use('/v1/events', limiter);
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    name: 'CamSpam Analytics API',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      events: 'POST /v1/events',
+      stats: {
+        overview: '/v1/stats/overview',
+        users: '/v1/stats/users',
+        features: '/v1/stats/features',
+        funnel: '/v1/stats/funnel',
+        realtime: '/v1/stats/realtime'
+      }
+    }
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
