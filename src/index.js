@@ -1264,6 +1264,397 @@ app.get('/v1/stats/revenuecat-events', async (req, res) => {
   }
 });
 
+// ============================================
+// INDIVIDUAL USER ANALYTICS
+// ============================================
+
+// GET /v1/users - List all users with stats
+app.get('/v1/users', async (req, res) => {
+  try {
+    const {
+      days = 90,
+      limit = 50,
+      offset = 0,
+      search = '',
+      filter = 'all', // all, purchasers, active, churned
+      sort = 'last_active', // last_active, first_seen, events, purchases
+      order = 'desc'
+    } = req.query;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    let filterClause = '';
+    if (filter === 'purchasers') {
+      filterClause = `AND device_id IN (
+        SELECT DISTINCT device_id FROM events
+        WHERE name = 'purchase_completed'
+      )`;
+    } else if (filter === 'active') {
+      filterClause = `AND last_active >= NOW() - INTERVAL '7 days'`;
+    } else if (filter === 'churned') {
+      filterClause = `AND last_active < NOW() - INTERVAL '30 days'`;
+    }
+
+    let searchClause = '';
+    if (search) {
+      searchClause = `AND (device_id ILIKE $4 OR user_id ILIKE $4)`;
+    }
+
+    const orderColumn = {
+      'last_active': 'last_active',
+      'first_seen': 'first_seen',
+      'events': 'total_events',
+      'purchases': 'purchase_count'
+    }[sort] || 'last_active';
+
+    const orderDir = order === 'asc' ? 'ASC' : 'DESC';
+
+    const params = [startDate.toISOString(), parseInt(limit), parseInt(offset)];
+    if (search) params.push(`%${search}%`);
+
+    const usersQuery = await pool.query(`
+      WITH user_stats AS (
+        SELECT
+          device_id,
+          user_id,
+          MIN(timestamp) as first_seen,
+          MAX(timestamp) as last_active,
+          COUNT(*) as total_events,
+          COUNT(DISTINCT session_id) as total_sessions,
+          COUNT(DISTINCT DATE(timestamp)) as active_days,
+          MAX(device_model) as device_model,
+          MAX(app_version) as app_version,
+          MAX(os_version) as os_version,
+          MAX(locale) as locale,
+          MAX(timezone) as timezone
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY device_id, user_id
+      ),
+      purchase_stats AS (
+        SELECT
+          device_id,
+          COUNT(*) as purchase_count,
+          SUM((properties->>'revenue')::numeric) as total_revenue
+        FROM events
+        WHERE name = 'purchase_completed' AND timestamp >= $1
+        GROUP BY device_id
+      ),
+      camera_stats AS (
+        SELECT
+          device_id,
+          COUNT(*) as photos_captured
+        FROM events
+        WHERE name = 'photo_captured' AND timestamp >= $1
+        GROUP BY device_id
+      )
+      SELECT
+        us.*,
+        COALESCE(ps.purchase_count, 0) as purchase_count,
+        COALESCE(ps.total_revenue, 0) as total_revenue,
+        COALESCE(cs.photos_captured, 0) as photos_captured,
+        CASE
+          WHEN ps.purchase_count > 0 THEN 'subscriber'
+          WHEN us.last_active >= NOW() - INTERVAL '7 days' THEN 'active'
+          WHEN us.last_active < NOW() - INTERVAL '30 days' THEN 'churned'
+          ELSE 'inactive'
+        END as user_status
+      FROM user_stats us
+      LEFT JOIN purchase_stats ps ON us.device_id = ps.device_id
+      LEFT JOIN camera_stats cs ON us.device_id = cs.device_id
+      WHERE 1=1 ${filterClause} ${searchClause}
+      ORDER BY ${orderColumn} ${orderDir}
+      LIMIT $2 OFFSET $3
+    `, params);
+
+    // Get total count for pagination
+    const countParams = [startDate.toISOString()];
+    if (search) countParams.push(`%${search}%`);
+
+    const countQuery = await pool.query(`
+      WITH user_stats AS (
+        SELECT
+          device_id,
+          MAX(timestamp) as last_active
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY device_id
+      )
+      SELECT COUNT(*) as total
+      FROM user_stats
+      WHERE 1=1 ${filterClause} ${search ? 'AND device_id ILIKE $2' : ''}
+    `, countParams);
+
+    res.json({
+      users: usersQuery.rows.map(u => ({
+        device_id: u.device_id,
+        user_id: u.user_id,
+        first_seen: u.first_seen,
+        last_active: u.last_active,
+        total_events: parseInt(u.total_events),
+        total_sessions: parseInt(u.total_sessions),
+        active_days: parseInt(u.active_days),
+        photos_captured: parseInt(u.photos_captured),
+        purchase_count: parseInt(u.purchase_count),
+        total_revenue: parseFloat(u.total_revenue) || 0,
+        user_status: u.user_status,
+        device_model: u.device_model,
+        app_version: u.app_version,
+        os_version: u.os_version,
+        locale: u.locale,
+        timezone: u.timezone
+      })),
+      pagination: {
+        total: parseInt(countQuery.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: parseInt(offset) + usersQuery.rows.length < parseInt(countQuery.rows[0].total)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// GET /v1/users/:device_id - Get individual user details and full event history
+app.get('/v1/users/:device_id', async (req, res) => {
+  try {
+    const { device_id } = req.params;
+    const { limit = 200 } = req.query;
+
+    const [userStats, events, purchaseHistory, profile] = await Promise.all([
+      // User summary stats
+      pool.query(`
+        SELECT
+          device_id,
+          user_id,
+          MIN(timestamp) as first_seen,
+          MAX(timestamp) as last_active,
+          COUNT(*) as total_events,
+          COUNT(DISTINCT session_id) as total_sessions,
+          COUNT(DISTINCT DATE(timestamp)) as active_days,
+          MAX(device_model) as device_model,
+          MAX(app_version) as app_version,
+          MAX(os_version) as os_version,
+          MAX(locale) as locale,
+          MAX(timezone) as timezone,
+          MAX(session_duration_seconds) as max_session_duration
+        FROM events
+        WHERE device_id = $1
+        GROUP BY device_id, user_id
+      `, [device_id]),
+
+      // Full event history (most recent first)
+      pool.query(`
+        SELECT
+          id,
+          name,
+          category,
+          properties,
+          timestamp,
+          session_id,
+          session_duration_seconds,
+          app_version,
+          build_number
+        FROM events
+        WHERE device_id = $1
+        ORDER BY timestamp DESC
+        LIMIT $2
+      `, [device_id, parseInt(limit)]),
+
+      // Purchase/subscription history from RevenueCat
+      pool.query(`
+        SELECT
+          event_type,
+          product_id,
+          price,
+          currency,
+          period_type,
+          purchased_at,
+          expiration_at,
+          is_trial_conversion,
+          created_at
+        FROM revenuecat_events
+        WHERE app_user_id = $1 OR original_app_user_id = $1
+        ORDER BY created_at DESC
+      `, [device_id]),
+
+      // User profile if exists
+      pool.query(`
+        SELECT * FROM user_profiles WHERE device_id = $1
+      `, [device_id])
+    ]);
+
+    if (userStats.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userStats.rows[0];
+
+    // Calculate engagement metrics
+    const daysSinceFirstSeen = Math.floor(
+      (new Date() - new Date(user.first_seen)) / (1000 * 60 * 60 * 24)
+    );
+    const daysSinceLastActive = Math.floor(
+      (new Date() - new Date(user.last_active)) / (1000 * 60 * 60 * 24)
+    );
+
+    // Determine user status
+    let userStatus = 'inactive';
+    if (purchaseHistory.rows.some(p => p.event_type === 'INITIAL_PURCHASE' || p.event_type === 'RENEWAL')) {
+      userStatus = 'subscriber';
+    } else if (daysSinceLastActive <= 7) {
+      userStatus = 'active';
+    } else if (daysSinceLastActive > 30) {
+      userStatus = 'churned';
+    }
+
+    // Event breakdown by type
+    const eventBreakdown = {};
+    events.rows.forEach(e => {
+      eventBreakdown[e.name] = (eventBreakdown[e.name] || 0) + 1;
+    });
+
+    // Session timeline
+    const sessions = {};
+    events.rows.forEach(e => {
+      if (e.session_id) {
+        if (!sessions[e.session_id]) {
+          sessions[e.session_id] = {
+            session_id: e.session_id,
+            events: [],
+            start: e.timestamp,
+            end: e.timestamp,
+            duration: e.session_duration_seconds
+          };
+        }
+        sessions[e.session_id].events.push(e);
+        if (new Date(e.timestamp) < new Date(sessions[e.session_id].start)) {
+          sessions[e.session_id].start = e.timestamp;
+        }
+        if (new Date(e.timestamp) > new Date(sessions[e.session_id].end)) {
+          sessions[e.session_id].end = e.timestamp;
+          sessions[e.session_id].duration = e.session_duration_seconds;
+        }
+      }
+    });
+
+    res.json({
+      user: {
+        device_id: user.device_id,
+        user_id: user.user_id,
+        first_seen: user.first_seen,
+        last_active: user.last_active,
+        days_since_install: daysSinceFirstSeen,
+        days_inactive: daysSinceLastActive,
+        total_events: parseInt(user.total_events),
+        total_sessions: parseInt(user.total_sessions),
+        active_days: parseInt(user.active_days),
+        max_session_duration: parseInt(user.max_session_duration) || 0,
+        status: userStatus,
+        device: {
+          model: user.device_model,
+          os_version: user.os_version,
+          app_version: user.app_version,
+          locale: user.locale,
+          timezone: user.timezone
+        }
+      },
+      profile: profile.rows[0] || null,
+      event_breakdown: eventBreakdown,
+      events: events.rows.map(e => ({
+        id: e.id,
+        name: e.name,
+        category: e.category,
+        properties: e.properties,
+        timestamp: e.timestamp,
+        session_id: e.session_id,
+        app_version: e.app_version
+      })),
+      sessions: Object.values(sessions).sort((a, b) =>
+        new Date(b.start) - new Date(a.start)
+      ).slice(0, 20),
+      purchases: purchaseHistory.rows
+    });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+// GET /v1/users/by-event/:event_name - Get all users who triggered a specific event
+app.get('/v1/users/by-event/:event_name', async (req, res) => {
+  try {
+    const { event_name } = req.params;
+    const { days = 30, limit = 100, offset = 0 } = req.query;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const usersQuery = await pool.query(`
+      WITH event_users AS (
+        SELECT
+          device_id,
+          COUNT(*) as event_count,
+          MIN(timestamp) as first_occurrence,
+          MAX(timestamp) as last_occurrence,
+          MAX(properties) as last_properties
+        FROM events
+        WHERE name = $1 AND timestamp >= $2
+        GROUP BY device_id
+      ),
+      user_stats AS (
+        SELECT
+          device_id,
+          MIN(timestamp) as first_seen,
+          MAX(timestamp) as last_active,
+          COUNT(*) as total_events
+        FROM events
+        GROUP BY device_id
+      )
+      SELECT
+        eu.*,
+        us.first_seen,
+        us.last_active,
+        us.total_events
+      FROM event_users eu
+      JOIN user_stats us ON eu.device_id = us.device_id
+      ORDER BY eu.last_occurrence DESC
+      LIMIT $3 OFFSET $4
+    `, [event_name, startDate.toISOString(), parseInt(limit), parseInt(offset)]);
+
+    const countQuery = await pool.query(`
+      SELECT COUNT(DISTINCT device_id) as total
+      FROM events
+      WHERE name = $1 AND timestamp >= $2
+    `, [event_name, startDate.toISOString()]);
+
+    res.json({
+      event_name,
+      users: usersQuery.rows.map(u => ({
+        device_id: u.device_id,
+        event_count: parseInt(u.event_count),
+        first_occurrence: u.first_occurrence,
+        last_occurrence: u.last_occurrence,
+        last_properties: u.last_properties,
+        first_seen: u.first_seen,
+        last_active: u.last_active,
+        total_events: parseInt(u.total_events)
+      })),
+      pagination: {
+        total: parseInt(countQuery.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching users by event:', error);
+    res.status(500).json({ error: 'Failed to fetch users by event' });
+  }
+});
+
 // GET /v1/stats/acquisition - Attribution and acquisition analytics
 app.get('/v1/stats/acquisition', async (req, res) => {
   try {

@@ -647,6 +647,299 @@
             transition: width 0.5s ease-out;
         }
 
+        /* User List */
+        .user-controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 44px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .search-box::before {
+            content: '🔍';
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+        }
+
+        .filter-select {
+            padding: 12px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .filter-select option {
+            background: var(--bg-secondary);
+        }
+
+        .user-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .user-table th {
+            padding: 16px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            font-weight: 600;
+            background: rgba(255,255,255,0.02);
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .user-table th:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .user-table th.sortable::after {
+            content: ' ↕';
+            opacity: 0.5;
+        }
+
+        .user-table th.sorted-asc::after {
+            content: ' ↑';
+            opacity: 1;
+        }
+
+        .user-table th.sorted-desc::after {
+            content: ' ↓';
+            opacity: 1;
+        }
+
+        .user-table td {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border-color);
+            font-size: 14px;
+        }
+
+        .user-table tr {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .user-table tbody tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .user-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .user-status.subscriber {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .user-status.active {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .user-status.inactive {
+            background: rgba(107, 114, 128, 0.2);
+            color: #9ca3af;
+        }
+
+        .user-status.churned {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .pagination-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .pagination-btn {
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pagination-btn:hover:not(:disabled) {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* User Detail View */
+        .user-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+        }
+
+        .user-detail-back {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 16px;
+            transition: color 0.2s;
+        }
+
+        .user-detail-back:hover {
+            color: var(--text-primary);
+        }
+
+        .user-id {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-family: monospace;
+            background: rgba(255,255,255,0.05);
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+
+        .event-timeline {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .timeline-event {
+            display: flex;
+            gap: 16px;
+            padding: 16px;
+            border-left: 2px solid var(--border-color);
+            margin-left: 8px;
+            position: relative;
+        }
+
+        .timeline-event::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 20px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            border: 2px solid var(--bg-secondary);
+        }
+
+        .timeline-event.revenue::before {
+            background: var(--accent-green);
+        }
+
+        .timeline-event.error::before {
+            background: var(--accent-red);
+        }
+
+        .timeline-event-time {
+            width: 100px;
+            flex-shrink: 0;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .timeline-event-content {
+            flex: 1;
+        }
+
+        .timeline-event-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .timeline-event-props {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.03);
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 8px;
+            font-family: monospace;
+        }
+
+        .event-breakdown-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .event-breakdown-item {
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .event-breakdown-count {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-blue);
+        }
+
+        .event-breakdown-name {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
         /* Responsive */
         @media (max-width: 1024px) {
             .sidebar { display: none; }
@@ -694,6 +987,10 @@
                 <div class="nav-item" data-page="realtime">
                     <span class="nav-item-icon">🔴</span>
                     <span>Real-Time</span>
+                </div>
+                <div class="nav-item" data-page="users">
+                    <span class="nav-item-icon">👤</span>
+                    <span>Users</span>
                 </div>
 
                 <div class="nav-section">
@@ -1313,6 +1610,159 @@
                                 <div class="empty-state-icon">📡</div>
                                 <div class="empty-state-text">Waiting for events...</div>
                                 <div class="empty-state-subtext">Events will appear here in real-time</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== USERS PAGE ==================== -->
+            <section class="page-section" id="page-users">
+                <!-- User List View -->
+                <div id="users-list-view">
+                    <header class="page-header">
+                        <div>
+                            <h1 class="page-title">Individual Users</h1>
+                            <p class="page-subtitle">See each user's complete behavior and journey</p>
+                        </div>
+                    </header>
+
+                    <div class="user-controls">
+                        <div class="search-box">
+                            <input type="text" id="userSearch" placeholder="Search by device ID..." />
+                        </div>
+                        <select class="filter-select" id="userFilter">
+                            <option value="all">All Users</option>
+                            <option value="purchasers">Purchasers Only</option>
+                            <option value="active">Active (7 days)</option>
+                            <option value="churned">Churned (30+ days)</option>
+                        </select>
+                        <select class="filter-select" id="userSort">
+                            <option value="last_active">Last Active</option>
+                            <option value="first_seen">First Seen</option>
+                            <option value="events">Most Events</option>
+                            <option value="purchases">Purchases</option>
+                        </select>
+                    </div>
+
+                    <table class="user-table">
+                        <thead>
+                            <tr>
+                                <th>Device ID</th>
+                                <th>Status</th>
+                                <th>First Seen</th>
+                                <th>Last Active</th>
+                                <th>Events</th>
+                                <th>Sessions</th>
+                                <th>Photos</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <tr><td colspan="8" class="empty-state-text">Loading users...</td></tr>
+                        </tbody>
+                    </table>
+
+                    <div class="pagination">
+                        <span id="paginationInfo">Showing 0 users</span>
+                        <div class="pagination-buttons">
+                            <button class="pagination-btn" id="prevPage" disabled>← Previous</button>
+                            <button class="pagination-btn" id="nextPage" disabled>Next →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Detail View (hidden by default) -->
+                <div id="users-detail-view" style="display: none;">
+                    <div class="user-detail-back" onclick="showUserList()">
+                        ← Back to User List
+                    </div>
+
+                    <header class="user-detail-header">
+                        <div>
+                            <h1 class="page-title" id="detailUserTitle">User Details</h1>
+                            <div class="user-id" id="detailDeviceId">-</div>
+                        </div>
+                        <span class="user-status" id="detailUserStatus">-</span>
+                    </header>
+
+                    <div class="stats-grid">
+                        <div class="stat-card users">
+                            <div class="stat-label">📅 Days Since Install</div>
+                            <div class="stat-value" id="detailDaysSinceInstall">-</div>
+                        </div>
+                        <div class="stat-card events">
+                            <div class="stat-label">📊 Total Events</div>
+                            <div class="stat-value" id="detailTotalEvents">-</div>
+                        </div>
+                        <div class="stat-card photos">
+                            <div class="stat-label">📸 Sessions</div>
+                            <div class="stat-value" id="detailTotalSessions">-</div>
+                        </div>
+                        <div class="stat-card revenue">
+                            <div class="stat-label">💰 Total Spend</div>
+                            <div class="stat-value" id="detailTotalSpend">$0</div>
+                        </div>
+                    </div>
+
+                    <div class="info-row">
+                        <div class="info-card">
+                            <div class="info-card-title">📱 Device Info</div>
+                            <div class="info-list" id="detailDeviceInfo">
+                                <div class="info-item">
+                                    <span class="info-item-label">Model</span>
+                                    <span class="info-item-value">-</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="info-card">
+                            <div class="info-card-title">⏱️ Activity</div>
+                            <div class="info-list" id="detailActivityInfo">
+                                <div class="info-item">
+                                    <span class="info-item-label">First Seen</span>
+                                    <span class="info-item-value">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div>
+                                    <div class="chart-title">Event Breakdown</div>
+                                    <div class="chart-subtitle">Events triggered by this user</div>
+                                </div>
+                            </div>
+                            <div class="event-breakdown-grid" id="eventBreakdownGrid">
+                                <div class="empty-state-text">No events</div>
+                            </div>
+                        </div>
+
+                        <div class="chart-card">
+                            <div class="chart-header">
+                                <div>
+                                    <div class="chart-title">Purchase History</div>
+                                    <div class="chart-subtitle">Subscription and revenue events</div>
+                                </div>
+                            </div>
+                            <div id="purchaseHistory">
+                                <div class="empty-state-text">No purchases</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-card" style="margin-top: 24px;">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Full Event Timeline</div>
+                                <div class="chart-subtitle">Complete history of user actions</div>
+                            </div>
+                        </div>
+                        <div class="event-timeline" id="eventTimeline">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">📋</div>
+                                <div class="empty-state-text">Loading timeline...</div>
                             </div>
                         </div>
                     </div>
@@ -2071,6 +2521,295 @@
             if (value >= 20) return 'medium';
             return 'low';
         }
+
+        // ============================================
+        // USERS PAGE FUNCTIONS
+        // ============================================
+
+        let usersData = { users: [], pagination: {} };
+        let currentUserOffset = 0;
+        const USERS_PER_PAGE = 50;
+        let userSearchTimeout = null;
+
+        // Initialize users page controls
+        document.addEventListener('DOMContentLoaded', () => {
+            // Search input with debounce
+            document.getElementById('userSearch').addEventListener('input', (e) => {
+                clearTimeout(userSearchTimeout);
+                userSearchTimeout = setTimeout(() => {
+                    currentUserOffset = 0;
+                    fetchUsersList();
+                }, 300);
+            });
+
+            // Filter change
+            document.getElementById('userFilter').addEventListener('change', () => {
+                currentUserOffset = 0;
+                fetchUsersList();
+            });
+
+            // Sort change
+            document.getElementById('userSort').addEventListener('change', () => {
+                currentUserOffset = 0;
+                fetchUsersList();
+            });
+
+            // Pagination buttons
+            document.getElementById('prevPage').addEventListener('click', () => {
+                if (currentUserOffset >= USERS_PER_PAGE) {
+                    currentUserOffset -= USERS_PER_PAGE;
+                    fetchUsersList();
+                }
+            });
+
+            document.getElementById('nextPage').addEventListener('click', () => {
+                if (usersData.pagination.has_more) {
+                    currentUserOffset += USERS_PER_PAGE;
+                    fetchUsersList();
+                }
+            });
+        });
+
+        async function fetchUsersList() {
+            try {
+                const search = document.getElementById('userSearch').value;
+                const filter = document.getElementById('userFilter').value;
+                const sort = document.getElementById('userSort').value;
+
+                const params = new URLSearchParams({
+                    days: 90,
+                    limit: USERS_PER_PAGE,
+                    offset: currentUserOffset,
+                    filter,
+                    sort,
+                    order: 'desc'
+                });
+
+                if (search) params.append('search', search);
+
+                const res = await fetch(`${API_BASE}/v1/users?${params}`);
+                usersData = await res.json();
+
+                renderUserTable();
+                updatePagination();
+            } catch (e) {
+                console.error('Error fetching users:', e);
+                document.getElementById('userTableBody').innerHTML =
+                    '<tr><td colspan="8" class="empty-state-text">Error loading users</td></tr>';
+            }
+        }
+
+        function renderUserTable() {
+            const tbody = document.getElementById('userTableBody');
+
+            if (!usersData.users?.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state-text">No users found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = usersData.users.map(user => `
+                <tr onclick="showUserDetail('${user.device_id}')">
+                    <td style="font-family: monospace; font-size: 12px;">${user.device_id.substring(0, 16)}...</td>
+                    <td><span class="user-status ${user.user_status}">${user.user_status}</span></td>
+                    <td>${formatDateTime(user.first_seen)}</td>
+                    <td>${formatDateTime(user.last_active)}</td>
+                    <td>${formatNumber(user.total_events)}</td>
+                    <td>${user.total_sessions}</td>
+                    <td>${user.photos_captured}</td>
+                    <td>${user.total_revenue > 0 ? formatCurrency(user.total_revenue) : '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updatePagination() {
+            const info = document.getElementById('paginationInfo');
+            const prevBtn = document.getElementById('prevPage');
+            const nextBtn = document.getElementById('nextPage');
+
+            const start = currentUserOffset + 1;
+            const end = currentUserOffset + usersData.users.length;
+            const total = usersData.pagination.total;
+
+            info.textContent = `Showing ${start}-${end} of ${total} users`;
+
+            prevBtn.disabled = currentUserOffset === 0;
+            nextBtn.disabled = !usersData.pagination.has_more;
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        async function showUserDetail(deviceId) {
+            // Hide list, show detail
+            document.getElementById('users-list-view').style.display = 'none';
+            document.getElementById('users-detail-view').style.display = 'block';
+
+            // Show loading state
+            document.getElementById('detailUserTitle').textContent = 'Loading...';
+
+            try {
+                const res = await fetch(`${API_BASE}/v1/users/${encodeURIComponent(deviceId)}`);
+                const data = await res.json();
+
+                renderUserDetail(data);
+            } catch (e) {
+                console.error('Error fetching user detail:', e);
+                document.getElementById('detailUserTitle').textContent = 'Error loading user';
+            }
+        }
+
+        function renderUserDetail(data) {
+            const { user, events, event_breakdown, purchases, profile } = data;
+
+            // Header
+            document.getElementById('detailUserTitle').textContent = formatDeviceModel(user.device?.model) || 'User';
+            document.getElementById('detailDeviceId').textContent = user.device_id;
+            document.getElementById('detailUserStatus').textContent = user.status;
+            document.getElementById('detailUserStatus').className = `user-status ${user.status}`;
+
+            // Stats
+            document.getElementById('detailDaysSinceInstall').textContent = user.days_since_install || '0';
+            document.getElementById('detailTotalEvents').textContent = formatNumber(user.total_events);
+            document.getElementById('detailTotalSessions').textContent = user.total_sessions || '0';
+
+            // Calculate total spend from purchases
+            const totalSpend = purchases?.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0) || 0;
+            document.getElementById('detailTotalSpend').textContent = formatCurrency(totalSpend);
+
+            // Device info
+            document.getElementById('detailDeviceInfo').innerHTML = `
+                <div class="info-item">
+                    <span class="info-item-label">Model</span>
+                    <span class="info-item-value">${formatDeviceModel(user.device?.model) || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">iOS Version</span>
+                    <span class="info-item-value">${user.device?.os_version || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">App Version</span>
+                    <span class="info-item-value">${user.device?.app_version || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Locale</span>
+                    <span class="info-item-value">${user.device?.locale || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Timezone</span>
+                    <span class="info-item-value">${user.device?.timezone || '-'}</span>
+                </div>
+            `;
+
+            // Activity info
+            document.getElementById('detailActivityInfo').innerHTML = `
+                <div class="info-item">
+                    <span class="info-item-label">First Seen</span>
+                    <span class="info-item-value">${formatDateTime(user.first_seen)}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Last Active</span>
+                    <span class="info-item-value">${formatDateTime(user.last_active)}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Days Inactive</span>
+                    <span class="info-item-value">${user.days_inactive || '0'} days</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Active Days</span>
+                    <span class="info-item-value">${user.active_days || '0'} days</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-item-label">Longest Session</span>
+                    <span class="info-item-value">${Math.round((user.max_session_duration || 0) / 60)}m</span>
+                </div>
+            `;
+
+            // Event breakdown
+            if (event_breakdown && Object.keys(event_breakdown).length > 0) {
+                const sortedEvents = Object.entries(event_breakdown)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 12);
+
+                document.getElementById('eventBreakdownGrid').innerHTML = sortedEvents.map(([name, count]) => `
+                    <div class="event-breakdown-item">
+                        <div class="event-breakdown-count">${count}</div>
+                        <div class="event-breakdown-name">${formatEventName(name)}</div>
+                    </div>
+                `).join('');
+            } else {
+                document.getElementById('eventBreakdownGrid').innerHTML =
+                    '<div class="empty-state-text">No events recorded</div>';
+            }
+
+            // Purchase history
+            if (purchases?.length > 0) {
+                document.getElementById('purchaseHistory').innerHTML = purchases.map(p => `
+                    <div class="event-item">
+                        <div class="event-icon subscription">💳</div>
+                        <div class="event-details">
+                            <div class="event-name">${p.event_type || 'Purchase'}</div>
+                            <div class="event-meta">${p.product_id || 'Unknown product'} - ${formatCurrency(p.price || 0)}</div>
+                        </div>
+                        <div class="event-time">${formatDateTime(p.purchased_at || p.created_at)}</div>
+                    </div>
+                `).join('');
+            } else {
+                document.getElementById('purchaseHistory').innerHTML =
+                    '<div class="empty-state-text">No purchases yet</div>';
+            }
+
+            // Event timeline
+            if (events?.length > 0) {
+                document.getElementById('eventTimeline').innerHTML = events.map(e => {
+                    const eventClass = e.name?.includes('purchase') || e.name?.includes('subscription') ? 'revenue' :
+                                       e.name?.includes('error') ? 'error' : '';
+                    const propsStr = e.properties && Object.keys(e.properties).length > 0
+                        ? JSON.stringify(e.properties, null, 2)
+                        : null;
+
+                    return `
+                        <div class="timeline-event ${eventClass}">
+                            <div class="timeline-event-time">${formatDateTime(e.timestamp)}</div>
+                            <div class="timeline-event-content">
+                                <div class="timeline-event-name">${getEventIcon(e.name)} ${formatEventName(e.name)}</div>
+                                ${propsStr ? `<div class="timeline-event-props">${propsStr}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                document.getElementById('eventTimeline').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div class="empty-state-text">No events recorded</div>
+                    </div>
+                `;
+            }
+        }
+
+        function showUserList() {
+            document.getElementById('users-detail-view').style.display = 'none';
+            document.getElementById('users-list-view').style.display = 'block';
+        }
+
+        // Load users when navigating to users page
+        document.querySelectorAll('.nav-item').forEach(item => {
+            const originalClick = item.onclick;
+            item.addEventListener('click', () => {
+                if (item.dataset.page === 'users') {
+                    showUserList();
+                    fetchUsersList();
+                }
+            });
+        });
     </script>
 </body>
 </html>
