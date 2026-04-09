@@ -316,6 +316,30 @@ app.post('/v1/verify/send', async (req, res) => {
       normalizedPhone = '+1' + normalizedPhone.replace(/^1/, '');
     }
 
+    // Test mode: allow fake numbers in development (555 numbers)
+    const isTestNumber = normalizedPhone.includes('555');
+    if (isTestNumber) {
+      console.log(`📱 Test mode: Skipping Twilio for ${normalizedPhone}`);
+
+      // Store test verification code (123456) in database
+      await pool.query(`
+        INSERT INTO user_profiles (device_id, phone, phone_verified, updated_at)
+        VALUES ($1, $2, false, NOW())
+        ON CONFLICT (device_id) DO UPDATE SET
+          phone = $2,
+          phone_verified = false,
+          updated_at = NOW()
+      `, [device_id, normalizedPhone]);
+
+      return res.json({
+        success: true,
+        status: 'pending',
+        phone: normalizedPhone.replace(/(\+\d{1,3})(\d{3})(\d{3})(\d{4})/, '$1 (***) ***-$4'),
+        testMode: true,
+        testCode: '123456'  // For development only
+      });
+    }
+
     // Use fetch instead of Twilio SDK to avoid ECONNREFUSED issues
     const twilioUrl = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/Verifications`;
     const authString = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
@@ -419,6 +443,37 @@ app.post('/v1/verify/check', async (req, res) => {
     let normalizedPhone = phone.replace(/[^\d+]/g, '');
     if (!normalizedPhone.startsWith('+')) {
       normalizedPhone = '+1' + normalizedPhone.replace(/^1/, '');
+    }
+
+    // Test mode: allow fake numbers (555 numbers) with test code
+    const isTestNumber = normalizedPhone.includes('555');
+    if (isTestNumber) {
+      const verified = code === '123456';
+      console.log(`📱 Test mode verify: ${normalizedPhone} code=${code} verified=${verified}`);
+
+      if (verified) {
+        // Mark phone as verified in database
+        const result = await pool.query(`
+          UPDATE user_profiles
+          SET phone_verified = true, updated_at = NOW()
+          WHERE device_id = $1
+          RETURNING *
+        `, [device_id]);
+
+        const profile = result.rows[0] || {};
+        return res.json({
+          verified: true,
+          profile: {
+            device_id: profile.device_id,
+            phone: profile.phone,
+            phone_verified: true,
+            email: profile.email,
+            email_verified: profile.email_verified
+          }
+        });
+      } else {
+        return res.json({ verified: false });
+      }
     }
 
     // Use fetch instead of Twilio SDK
