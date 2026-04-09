@@ -135,22 +135,40 @@ app.post('/auth/login', (req, res) => {
     attempts: 0
   });
 
-  // Send SMS via Twilio Verify
-  if (twilioClient && TWILIO_VERIFY_SERVICE_SID) {
-    twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID)
-      .verifications.create({ to: user.phone, channel: 'sms' })
-      .then(() => {
+  // Send SMS via Twilio Verify using fetch
+  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && TWILIO_VERIFY_SERVICE_SID) {
+    const twilioUrl = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/Verifications`;
+    const authString = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
+
+    console.log('Sending verification to:', user.phone);
+
+    fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${authString}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `To=${encodeURIComponent(user.phone)}&Channel=sms`
+    })
+    .then(r => r.json())
+    .then(data => {
+      console.log('Twilio send verification response:', JSON.stringify(data));
+      if (data.status === 'pending') {
         res.json({
           success: true,
           verificationId,
           message: 'Verification code sent to your phone',
           phoneLast4: user.phone.slice(-4)
         });
-      })
-      .catch(err => {
-        console.error('Twilio error:', err);
-        res.status(500).json({ error: 'Failed to send verification code' });
-      });
+      } else {
+        console.error('Twilio error:', data);
+        res.status(500).json({ error: data.message || 'Failed to send verification code' });
+      }
+    })
+    .catch(err => {
+      console.error('Twilio error:', err);
+      res.status(500).json({ error: 'Failed to send verification code' });
+    });
   } else {
     res.status(500).json({ error: 'SMS service not configured' });
   }
@@ -182,12 +200,31 @@ app.post('/auth/verify', async (req, res) => {
 
   const user = adminUsers[pending.username];
 
-  // Verify code with Twilio
+  // Verify code with Twilio using fetch (more reliable than SDK)
   try {
-    const verification = await twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID)
-      .verificationChecks.create({ to: user.phone, code });
+    const twilioUrl = `https://verify.twilio.com/v2/Services/${TWILIO_VERIFY_SERVICE_SID}/VerificationCheck`;
+    const authString = Buffer.from(`${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`).toString('base64');
 
-    if (verification.status !== 'approved') {
+    console.log('Verifying code for phone:', user.phone, 'code:', code);
+
+    const twilioResponse = await fetch(twilioUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${authString}`,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `To=${encodeURIComponent(user.phone)}&Code=${encodeURIComponent(code)}`
+    });
+
+    const twilioData = await twilioResponse.json();
+    console.log('Twilio verification response:', JSON.stringify(twilioData));
+
+    if (!twilioResponse.ok) {
+      console.error('Twilio error:', twilioData);
+      return res.status(401).json({ error: twilioData.message || 'Verification failed' });
+    }
+
+    if (twilioData.status !== 'approved') {
       return res.status(401).json({ error: 'Invalid code' });
     }
 
@@ -206,8 +243,8 @@ app.post('/auth/verify', async (req, res) => {
       user: { username: pending.username, name: user.name }
     });
   } catch (err) {
-    console.error('Verification error:', err);
-    res.status(401).json({ error: 'Invalid code' });
+    console.error('Verification error:', err.message, err.stack);
+    res.status(500).json({ error: 'Verification service error: ' + err.message });
   }
 });
 
