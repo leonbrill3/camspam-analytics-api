@@ -2030,6 +2030,13 @@
                         // Refresh page-specific data
                         if (page === 'realtime') fetchRealtime();
                         if (page === 'revenuecat') fetchRevenueCatEvents();
+                        if (page === 'users') {
+                            // Reset to list view and fetch users
+                            document.getElementById('users-list-view').style.display = 'block';
+                            document.getElementById('users-detail-view').style.display = 'none';
+                            currentUserOffset = 0;
+                            fetchUsersList();
+                        }
                     }
                 });
             });
