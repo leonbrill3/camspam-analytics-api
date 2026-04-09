@@ -107,16 +107,22 @@ function requireAuth(req, res, next) {
 app.post('/auth/login', (req, res) => {
   const { username, password } = req.body;
 
+  console.log('Login attempt:', { username, passwordLength: password?.length });
+
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
   const user = adminUsers[username.toLowerCase()];
+  console.log('User found:', !!user, 'for username:', username.toLowerCase());
+
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
   const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+  console.log('Password match:', passwordHash === user.passwordHash);
+
   if (passwordHash !== user.passwordHash) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
