@@ -1111,6 +1111,22 @@
                         <span class="nav-item-icon">💳</span>
                         <span>RevenueCat</span>
                     </div>
+                    <div class="nav-item" data-page="amplitude">
+                        <span class="nav-item-icon">📉</span>
+                        <span>Amplitude</span>
+                    </div>
+                    <div class="nav-item" data-page="appsflyer">
+                        <span class="nav-item-icon">🎯</span>
+                        <span>AppsFlyer</span>
+                    </div>
+                    <div class="nav-item" data-page="sentry">
+                        <span class="nav-item-icon">🐛</span>
+                        <span>Sentry</span>
+                    </div>
+                    <div class="nav-item" data-page="integrations">
+                        <span class="nav-item-icon">🔗</span>
+                        <span>Status</span>
+                    </div>
                 </div>
             </nav>
         </aside>
@@ -1942,6 +1958,254 @@
                             <div class="empty-state-icon">💳</div>
                             <div class="empty-state-text">No RevenueCat events yet</div>
                             <div class="empty-state-subtext">Configure webhooks to see subscription events</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== AMPLITUDE PAGE ==================== -->
+            <section class="page-section" id="page-amplitude">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Amplitude Analytics</h1>
+                        <p class="page-subtitle">User behavior analytics and product metrics</p>
+                    </div>
+                    <div class="header-controls">
+                        <span id="amplitudeStatus" class="status-badge">Checking...</span>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">📊 Daily Active Users</div>
+                        <div class="stat-value" id="ampDAU">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🆕 New Users</div>
+                        <div class="stat-value" id="ampNewUsers">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">⚡ Total Events</div>
+                        <div class="stat-value" id="ampEvents">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">⏱️ Avg Session</div>
+                        <div class="stat-value" id="ampSession">-</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">User Activity</div>
+                            <div class="chart-subtitle">Daily active and new users from Amplitude</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="amplitudeChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="info-card" id="amplitudeSetup" style="display: none;">
+                    <div class="info-card-title">⚙️ Amplitude Setup Required</div>
+                    <div class="info-list" style="font-size: 13px; color: var(--text-secondary);">
+                        <p>Add these environment variables to Render:</p>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">AMPLITUDE_API_KEY=your_api_key</code>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">AMPLITUDE_SECRET_KEY=your_secret_key</code>
+                        <p style="margin-top: 12px;">Get these from: Amplitude → Settings → Projects → API Keys</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== APPSFLYER PAGE ==================== -->
+            <section class="page-section" id="page-appsflyer">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">AppsFlyer Attribution</h1>
+                        <p class="page-subtitle">Install attribution and ROAS metrics</p>
+                    </div>
+                    <div class="header-controls">
+                        <span id="appsflyerStatus" class="status-badge">Checking...</span>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">📲 Total Installs</div>
+                        <div class="stat-value" id="afInstalls">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🌿 Organic</div>
+                        <div class="stat-value" id="afOrganic">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">💰 Paid</div>
+                        <div class="stat-value" id="afPaid">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📈 ROAS</div>
+                        <div class="stat-value" id="afROAS">-</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Install Sources</div>
+                            <div class="chart-subtitle">Attribution breakdown by media source</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="appsflyerChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Daily Installs</div>
+                            <div class="chart-subtitle">Install trend over time</div>
+                        </div>
+                    </div>
+                    <div class="realtime-feed" id="afSourcesFeed">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🎯</div>
+                            <div class="empty-state-text">Loading attribution data...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card" id="appsflyerSetup" style="display: none;">
+                    <div class="info-card-title">⚙️ AppsFlyer Setup Required</div>
+                    <div class="info-list" style="font-size: 13px; color: var(--text-secondary);">
+                        <p>Add these environment variables to Render:</p>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">APPSFLYER_API_TOKEN=your_api_token</code>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">APPSFLYER_APP_ID=id6740044498</code>
+                        <p style="margin-top: 12px;">Get the API token from: AppsFlyer → Settings → API Tokens</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== SENTRY PAGE ==================== -->
+            <section class="page-section" id="page-sentry">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Sentry Error Tracking</h1>
+                        <p class="page-subtitle">Crashes, errors, and app stability</p>
+                    </div>
+                    <div class="header-controls">
+                        <span id="sentryStatus" class="status-badge">Checking...</span>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">🐛 Total Events</div>
+                        <div class="stat-value" id="sentryEvents">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">⚠️ Unresolved</div>
+                        <div class="stat-value" id="sentryUnresolved">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🔴 Critical</div>
+                        <div class="stat-value" id="sentryCritical">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">✅ Crash-Free</div>
+                        <div class="stat-value" id="sentryCrashFree">-</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Error Events Over Time</div>
+                            <div class="chart-subtitle">Daily error count from Sentry</div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="sentryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Unresolved Issues</div>
+                            <div class="chart-subtitle">Top issues requiring attention</div>
+                        </div>
+                    </div>
+                    <div class="realtime-feed" id="sentryIssuesFeed">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🐛</div>
+                            <div class="empty-state-text">Loading issues...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="info-card" id="sentrySetup" style="display: none;">
+                    <div class="info-card-title">⚙️ Sentry Setup Required</div>
+                    <div class="info-list" style="font-size: 13px; color: var(--text-secondary);">
+                        <p>Add these environment variables to Render:</p>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">SENTRY_AUTH_TOKEN=your_auth_token</code>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">SENTRY_ORG=camspam</code>
+                        <code style="background: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 6px; display: block; margin: 8px 0;">SENTRY_PROJECT=camspam-ios</code>
+                        <p style="margin-top: 12px;">Create an auth token at: Sentry → Settings → Auth Tokens</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== INTEGRATIONS STATUS PAGE ==================== -->
+            <section class="page-section" id="page-integrations">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Integration Status</h1>
+                        <p class="page-subtitle">Connected services and configuration</p>
+                    </div>
+                    <div class="header-controls">
+                        <button class="refresh-btn" onclick="loadIntegrationsStatus()">
+                            <span>Refresh</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="stats-grid" id="integrationsGrid">
+                    <div class="stat-card" id="int-revenuecat">
+                        <div class="stat-label">💳 RevenueCat</div>
+                        <div class="stat-value" style="font-size: 16px;">Checking...</div>
+                    </div>
+                    <div class="stat-card" id="int-amplitude">
+                        <div class="stat-label">📉 Amplitude</div>
+                        <div class="stat-value" style="font-size: 16px;">Checking...</div>
+                    </div>
+                    <div class="stat-card" id="int-appsflyer">
+                        <div class="stat-label">🎯 AppsFlyer</div>
+                        <div class="stat-value" style="font-size: 16px;">Checking...</div>
+                    </div>
+                    <div class="stat-card" id="int-sentry">
+                        <div class="stat-label">🐛 Sentry</div>
+                        <div class="stat-value" style="font-size: 16px;">Checking...</div>
+                    </div>
+                </div>
+
+                <div class="info-row">
+                    <div class="info-card" style="flex: 1;">
+                        <div class="info-card-title">📋 Environment Variables</div>
+                        <div class="info-list" style="font-size: 13px; color: var(--text-secondary);">
+                            <p>Configure these in Render Dashboard → Environment:</p>
+                            <div style="margin-top: 12px;">
+                                <strong style="color: var(--text-primary);">Amplitude:</strong>
+                                <code style="display: block; background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 4px; margin: 4px 0;">AMPLITUDE_API_KEY, AMPLITUDE_SECRET_KEY</code>
+                            </div>
+                            <div style="margin-top: 12px;">
+                                <strong style="color: var(--text-primary);">AppsFlyer:</strong>
+                                <code style="display: block; background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 4px; margin: 4px 0;">APPSFLYER_API_TOKEN, APPSFLYER_APP_ID</code>
+                            </div>
+                            <div style="margin-top: 12px;">
+                                <strong style="color: var(--text-primary);">Sentry:</strong>
+                                <code style="display: block; background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 4px; margin: 4px 0;">SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT</code>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -3315,8 +3579,401 @@
                     showUserList();
                     fetchUsersList();
                 }
+                // Load integration pages
+                if (item.dataset.page === 'amplitude') {
+                    loadAmplitudeData();
+                }
+                if (item.dataset.page === 'appsflyer') {
+                    loadAppsFlyerData();
+                }
+                if (item.dataset.page === 'sentry') {
+                    loadSentryData();
+                }
+                if (item.dataset.page === 'integrations') {
+                    loadIntegrationsStatus();
+                }
             });
         });
+
+        // ============================================
+        // AMPLITUDE INTEGRATION
+        // ============================================
+
+        let amplitudeChart = null;
+
+        async function loadAmplitudeData() {
+            try {
+                document.getElementById('amplitudeStatus').textContent = 'Loading...';
+                document.getElementById('amplitudeStatus').style.background = 'var(--accent-blue)';
+
+                const res = await fetch(`${API_BASE}/v1/amplitude/user-activity?${getDateParams()}`);
+                const data = await res.json();
+
+                if (!data.configured) {
+                    document.getElementById('amplitudeStatus').textContent = 'Not Configured';
+                    document.getElementById('amplitudeStatus').style.background = 'var(--accent-orange)';
+                    document.getElementById('amplitudeSetup').style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('amplitudeStatus').textContent = 'Connected';
+                document.getElementById('amplitudeStatus').style.background = 'var(--accent-green)';
+                document.getElementById('amplitudeSetup').style.display = 'none';
+
+                // Update stats
+                const activeTotal = data.active_users?.reduce((sum, d) => sum + (d.count || 0), 0) || 0;
+                const newTotal = data.new_users?.reduce((sum, d) => sum + (d.count || 0), 0) || 0;
+
+                document.getElementById('ampDAU').textContent = formatNumber(activeTotal);
+                document.getElementById('ampNewUsers').textContent = formatNumber(newTotal);
+
+                // Get events data
+                const eventsRes = await fetch(`${API_BASE}/v1/amplitude/charts?${getDateParams()}`);
+                const eventsData = await eventsRes.json();
+
+                const totalEvents = eventsData.event_counts?.reduce((sum, d) => sum + (d.count || 0), 0) || 0;
+                document.getElementById('ampEvents').textContent = formatNumber(totalEvents);
+
+                // Avg session
+                const avgSession = data.avg_session_length?.[0]?.value || 0;
+                document.getElementById('ampSession').textContent = avgSession > 0 ? `${Math.round(avgSession / 60)}m` : '-';
+
+                // Update chart
+                updateAmplitudeChart(data);
+
+            } catch (error) {
+                console.error('Error loading Amplitude data:', error);
+                document.getElementById('amplitudeStatus').textContent = 'Error';
+                document.getElementById('amplitudeStatus').style.background = 'var(--accent-red)';
+            }
+        }
+
+        function updateAmplitudeChart(data) {
+            const ctx = document.getElementById('amplitudeChart').getContext('2d');
+
+            if (amplitudeChart) {
+                amplitudeChart.destroy();
+            }
+
+            const activeUsers = data.active_users || [];
+            const newUsers = data.new_users || [];
+
+            amplitudeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: activeUsers.map(d => d.date || ''),
+                    datasets: [
+                        {
+                            label: 'Active Users',
+                            data: activeUsers.map(d => d.count || 0),
+                            borderColor: 'rgba(96, 165, 250, 1)',
+                            backgroundColor: 'rgba(96, 165, 250, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'New Users',
+                            data: newUsers.map(d => d.count || 0),
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true } },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // APPSFLYER INTEGRATION
+        // ============================================
+
+        let appsflyerChart = null;
+
+        async function loadAppsFlyerData() {
+            try {
+                document.getElementById('appsflyerStatus').textContent = 'Loading...';
+                document.getElementById('appsflyerStatus').style.background = 'var(--accent-blue)';
+
+                const [overviewRes, installsRes, sourcesRes] = await Promise.all([
+                    fetch(`${API_BASE}/v1/appsflyer/overview?${getDateParams()}`),
+                    fetch(`${API_BASE}/v1/appsflyer/installs?${getDateParams()}`),
+                    fetch(`${API_BASE}/v1/appsflyer/sources?${getDateParams()}`)
+                ]);
+
+                const overview = await overviewRes.json();
+
+                if (!overview.configured) {
+                    document.getElementById('appsflyerStatus').textContent = 'Not Configured';
+                    document.getElementById('appsflyerStatus').style.background = 'var(--accent-orange)';
+                    document.getElementById('appsflyerSetup').style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('appsflyerStatus').textContent = 'Connected';
+                document.getElementById('appsflyerStatus').style.background = 'var(--accent-green)';
+                document.getElementById('appsflyerSetup').style.display = 'none';
+
+                const installs = await installsRes.json();
+                const sources = await sourcesRes.json();
+
+                // Calculate totals from attribution data
+                let totalInstalls = 0;
+                let organicInstalls = 0;
+                let paidInstalls = 0;
+
+                (overview.attribution_data || []).forEach(row => {
+                    const installs = parseInt(row.Installs || row.installs || 0);
+                    totalInstalls += installs;
+                    if (row['Media Source'] === 'Organic' || row.media_source === 'organic') {
+                        organicInstalls += installs;
+                    } else {
+                        paidInstalls += installs;
+                    }
+                });
+
+                document.getElementById('afInstalls').textContent = formatNumber(totalInstalls);
+                document.getElementById('afOrganic').textContent = formatNumber(organicInstalls);
+                document.getElementById('afPaid').textContent = formatNumber(paidInstalls);
+                document.getElementById('afROAS').textContent = '-'; // Would need revenue data
+
+                // Update sources feed
+                updateAppsFlyerSources(sources.sources || []);
+                updateAppsFlyerChart(overview.attribution_data || []);
+
+            } catch (error) {
+                console.error('Error loading AppsFlyer data:', error);
+                document.getElementById('appsflyerStatus').textContent = 'Error';
+                document.getElementById('appsflyerStatus').style.background = 'var(--accent-red)';
+            }
+        }
+
+        function updateAppsFlyerSources(sources) {
+            const feed = document.getElementById('afSourcesFeed');
+            if (sources.length === 0) {
+                feed.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🎯</div>
+                        <div class="empty-state-text">No attribution data available</div>
+                    </div>
+                `;
+                return;
+            }
+
+            feed.innerHTML = sources.slice(0, 20).map(s => `
+                <div class="event-item">
+                    <span class="event-name">${s['Media Source'] || s.pid || 'Unknown'}</span>
+                    <span class="event-count">${s.Installs || s.installs || 0} installs</span>
+                </div>
+            `).join('');
+        }
+
+        function updateAppsFlyerChart(data) {
+            const ctx = document.getElementById('appsflyerChart').getContext('2d');
+
+            if (appsflyerChart) {
+                appsflyerChart.destroy();
+            }
+
+            const sourceMap = {};
+            data.forEach(row => {
+                const source = row['Media Source'] || row.pid || 'Unknown';
+                const installs = parseInt(row.Installs || row.installs || 0);
+                sourceMap[source] = (sourceMap[source] || 0) + installs;
+            });
+
+            const labels = Object.keys(sourceMap).slice(0, 8);
+            const values = labels.map(l => sourceMap[l]);
+
+            appsflyerChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: [
+                            'rgba(96, 165, 250, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(168, 85, 247, 0.8)',
+                            'rgba(249, 115, 22, 0.8)',
+                            'rgba(236, 72, 153, 0.8)',
+                            'rgba(34, 211, 238, 0.8)',
+                            'rgba(250, 204, 21, 0.8)',
+                            'rgba(156, 163, 175, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // SENTRY INTEGRATION
+        // ============================================
+
+        let sentryChart = null;
+
+        async function loadSentryData() {
+            try {
+                document.getElementById('sentryStatus').textContent = 'Loading...';
+                document.getElementById('sentryStatus').style.background = 'var(--accent-blue)';
+
+                const res = await fetch(`${API_BASE}/v1/sentry/overview?days=${currentDays}`);
+                const data = await res.json();
+
+                if (!data.configured) {
+                    document.getElementById('sentryStatus').textContent = 'Not Configured';
+                    document.getElementById('sentryStatus').style.background = 'var(--accent-orange)';
+                    document.getElementById('sentrySetup').style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('sentryStatus').textContent = 'Connected';
+                document.getElementById('sentryStatus').style.background = 'var(--accent-green)';
+                document.getElementById('sentrySetup').style.display = 'none';
+
+                // Update stats
+                document.getElementById('sentryEvents').textContent = formatNumber(data.summary?.total_events || 0);
+                document.getElementById('sentryUnresolved').textContent = formatNumber(data.summary?.unresolved_issues || 0);
+                document.getElementById('sentryCritical').textContent = formatNumber(data.summary?.critical_issues || 0);
+                document.getElementById('sentryCrashFree').textContent = '-'; // Requires Team plan
+
+                // Update issues feed
+                updateSentryIssues(data.issues || []);
+                updateSentryChart(data.events_by_day || []);
+
+            } catch (error) {
+                console.error('Error loading Sentry data:', error);
+                document.getElementById('sentryStatus').textContent = 'Error';
+                document.getElementById('sentryStatus').style.background = 'var(--accent-red)';
+            }
+        }
+
+        function updateSentryIssues(issues) {
+            const feed = document.getElementById('sentryIssuesFeed');
+            if (issues.length === 0) {
+                feed.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✅</div>
+                        <div class="empty-state-text">No unresolved issues!</div>
+                    </div>
+                `;
+                return;
+            }
+
+            feed.innerHTML = issues.slice(0, 15).map(issue => `
+                <div class="event-item" style="cursor: pointer;" onclick="window.open('${issue.permalink}', '_blank')">
+                    <div style="flex: 1;">
+                        <div class="event-name" style="color: ${issue.level === 'error' || issue.level === 'fatal' ? 'var(--accent-red)' : 'var(--text-primary)'}">
+                            ${issue.level === 'fatal' ? '💥' : issue.level === 'error' ? '🔴' : '⚠️'} ${issue.title}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+                            ${issue.culprit || ''} • ${issue.count} events • ${issue.user_count} users
+                        </div>
+                    </div>
+                    <span class="event-count">${issue.short_id}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateSentryChart(data) {
+            const ctx = document.getElementById('sentryChart').getContext('2d');
+
+            if (sentryChart) {
+                sentryChart.destroy();
+            }
+
+            sentryChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.date),
+                    datasets: [{
+                        label: 'Error Events',
+                        data: data.map(d => d.count),
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // INTEGRATIONS STATUS
+        // ============================================
+
+        async function loadIntegrationsStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/integrations/status`);
+                const status = await res.json();
+
+                // Update each integration card
+                updateIntegrationCard('int-revenuecat', status.revenuecat);
+                updateIntegrationCard('int-amplitude', status.amplitude);
+                updateIntegrationCard('int-appsflyer', status.appsflyer);
+                updateIntegrationCard('int-sentry', status.sentry);
+
+            } catch (error) {
+                console.error('Error loading integrations status:', error);
+            }
+        }
+
+        function updateIntegrationCard(id, status) {
+            const card = document.getElementById(id);
+            if (!card) return;
+
+            const valueEl = card.querySelector('.stat-value');
+
+            if (status.status === 'active') {
+                valueEl.textContent = '✅ Connected';
+                valueEl.style.color = 'var(--accent-green)';
+                card.style.borderColor = 'var(--accent-green)';
+            } else if (status.status === 'not_configured') {
+                valueEl.textContent = '⚠️ Not Configured';
+                valueEl.style.color = 'var(--accent-orange)';
+                card.style.borderColor = 'var(--accent-orange)';
+            } else {
+                valueEl.textContent = '❌ Error';
+                valueEl.style.color = 'var(--accent-red)';
+                card.style.borderColor = 'var(--accent-red)';
+            }
+        }
+
+        // Add CSS for status badge
+        const style = document.createElement('style');
+        style.textContent = `
+            .status-badge {
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 12px;
+                font-weight: 600;
+                color: white;
+                background: var(--accent-blue);
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>

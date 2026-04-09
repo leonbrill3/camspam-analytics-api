@@ -8,6 +8,23 @@ const path = require('path');
 const dns = require('dns');
 const twilio = require('twilio');
 
+// ============================================
+// THIRD-PARTY API CONFIGURATION
+// ============================================
+
+// Amplitude API credentials
+const AMPLITUDE_API_KEY = process.env.AMPLITUDE_API_KEY;
+const AMPLITUDE_SECRET_KEY = process.env.AMPLITUDE_SECRET_KEY;
+
+// AppsFlyer API credentials
+const APPSFLYER_API_TOKEN = process.env.APPSFLYER_API_TOKEN;
+const APPSFLYER_APP_ID = process.env.APPSFLYER_APP_ID || 'id6740044498'; // CamSpam App ID
+
+// Sentry API credentials
+const SENTRY_AUTH_TOKEN = process.env.SENTRY_AUTH_TOKEN;
+const SENTRY_ORG = process.env.SENTRY_ORG || 'camspam';
+const SENTRY_PROJECT = process.env.SENTRY_PROJECT || 'camspam-ios';
+
 // Force IPv4 to avoid ECONNREFUSED on some cloud platforms
 dns.setDefaultResultOrder('ipv4first');
 
@@ -1931,9 +1948,679 @@ app.get('/v1/stats/acquisition', async (req, res) => {
   }
 });
 
+// ============================================
+// AMPLITUDE API INTEGRATION
+// ============================================
+
+// GET /v1/amplitude/charts - Get Amplitude chart data
+app.get('/v1/amplitude/charts', async (req, res) => {
+  try {
+    if (!AMPLITUDE_API_KEY || !AMPLITUDE_SECRET_KEY) {
+      return res.status(503).json({ error: 'Amplitude not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+    // Fetch multiple metrics in parallel
+    const [dauResponse, eventCountResponse, retentionResponse] = await Promise.all([
+      // Daily Active Users
+      fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}`, {
+        headers: { 'Authorization': `Basic ${authString}` }
+      }),
+      // Event totals
+      fetch(`https://amplitude.com/api/2/events/sum?start=${start}&end=${end}&e={"event_type":"_all"}`, {
+        headers: { 'Authorization': `Basic ${authString}` }
+      }),
+      // Retention
+      fetch(`https://amplitude.com/api/2/retention?start=${start}&end=${end}&re={"event_type":"_all"}&se={"event_type":"_all"}`, {
+        headers: { 'Authorization': `Basic ${authString}` }
+      })
+    ]);
+
+    const [dau, eventCount, retention] = await Promise.all([
+      dauResponse.json(),
+      eventCountResponse.json(),
+      retentionResponse.json()
+    ]);
+
+    res.json({
+      configured: true,
+      daily_active_users: dau.data || [],
+      event_counts: eventCount.data || [],
+      retention: retention.data || [],
+      date_range: { start: startDate, end: endDate }
+    });
+  } catch (error) {
+    console.error('Error fetching Amplitude data:', error);
+    res.status(500).json({ error: 'Failed to fetch Amplitude data', message: error.message });
+  }
+});
+
+// GET /v1/amplitude/events - Get top events from Amplitude
+app.get('/v1/amplitude/events', async (req, res) => {
+  try {
+    if (!AMPLITUDE_API_KEY || !AMPLITUDE_SECRET_KEY) {
+      return res.status(503).json({ error: 'Amplitude not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+    const response = await fetch(
+      `https://amplitude.com/api/2/events/list?start=${start}&end=${end}`,
+      { headers: { 'Authorization': `Basic ${authString}` } }
+    );
+
+    const data = await response.json();
+
+    res.json({
+      configured: true,
+      events: data.data || [],
+      date_range: { start: startDate, end: endDate }
+    });
+  } catch (error) {
+    console.error('Error fetching Amplitude events:', error);
+    res.status(500).json({ error: 'Failed to fetch Amplitude events', message: error.message });
+  }
+});
+
+// GET /v1/amplitude/user-activity - Get user activity metrics
+app.get('/v1/amplitude/user-activity', async (req, res) => {
+  try {
+    if (!AMPLITUDE_API_KEY || !AMPLITUDE_SECRET_KEY) {
+      return res.status(503).json({ error: 'Amplitude not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+    const [activeUsers, newUsers, sessions] = await Promise.all([
+      fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=active`, {
+        headers: { 'Authorization': `Basic ${authString}` }
+      }),
+      fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
+        headers: { 'Authorization': `Basic ${authString}` }
+      }),
+      fetch(`https://amplitude.com/api/2/sessions/average?start=${start}&end=${end}`, {
+        headers: { 'Authorization': `Basic ${authString}` }
+      })
+    ]);
+
+    const [activeData, newData, sessionData] = await Promise.all([
+      activeUsers.json(),
+      newUsers.json(),
+      sessions.json()
+    ]);
+
+    res.json({
+      configured: true,
+      active_users: activeData.data || [],
+      new_users: newData.data || [],
+      avg_session_length: sessionData.data || [],
+      date_range: { start: startDate, end: endDate }
+    });
+  } catch (error) {
+    console.error('Error fetching Amplitude user activity:', error);
+    res.status(500).json({ error: 'Failed to fetch user activity', message: error.message });
+  }
+});
+
+// GET /v1/amplitude/funnel - Get funnel data from Amplitude
+app.get('/v1/amplitude/funnel', async (req, res) => {
+  try {
+    if (!AMPLITUDE_API_KEY || !AMPLITUDE_SECRET_KEY) {
+      return res.status(503).json({ error: 'Amplitude not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+    // Define the funnel steps
+    const funnelEvents = [
+      'app_opened',
+      'camera_opened',
+      'photo_captured',
+      'paywall_viewed',
+      'purchase_started',
+      'purchase_completed'
+    ];
+
+    const funnelQuery = funnelEvents.map(e => `{"event_type":"${e}"}`).join(',');
+
+    const response = await fetch(
+      `https://amplitude.com/api/2/funnels?start=${start}&end=${end}&e=[${funnelQuery}]`,
+      { headers: { 'Authorization': `Basic ${authString}` } }
+    );
+
+    const data = await response.json();
+
+    res.json({
+      configured: true,
+      funnel: data.data || [],
+      steps: funnelEvents,
+      date_range: { start: startDate, end: endDate }
+    });
+  } catch (error) {
+    console.error('Error fetching Amplitude funnel:', error);
+    res.status(500).json({ error: 'Failed to fetch funnel data', message: error.message });
+  }
+});
+
+// ============================================
+// APPSFLYER API INTEGRATION
+// ============================================
+
+// GET /v1/appsflyer/overview - Get AppsFlyer attribution overview
+app.get('/v1/appsflyer/overview', async (req, res) => {
+  try {
+    if (!APPSFLYER_API_TOKEN) {
+      return res.status(503).json({ error: 'AppsFlyer not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const from = startDate.toISOString().split('T')[0];
+    const to = endDate.toISOString().split('T')[0];
+
+    // AppsFlyer Pull API - Aggregated Performance Report
+    const response = await fetch(
+      `https://hq1.appsflyer.com/api/agg-data/export/app/${APPSFLYER_APP_ID}/partners_report/v5?from=${from}&to=${to}&timezone=UTC`,
+      {
+        headers: {
+          'Authorization': `Bearer ${APPSFLYER_API_TOKEN}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('AppsFlyer API error:', response.status, errorText);
+      return res.status(response.status).json({
+        error: 'AppsFlyer API error',
+        status: response.status,
+        message: errorText
+      });
+    }
+
+    const csvData = await response.text();
+
+    // Parse CSV to JSON
+    const lines = csvData.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const data = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = values[i]; });
+      return obj;
+    });
+
+    res.json({
+      configured: true,
+      attribution_data: data,
+      date_range: { from, to }
+    });
+  } catch (error) {
+    console.error('Error fetching AppsFlyer data:', error);
+    res.status(500).json({ error: 'Failed to fetch AppsFlyer data', message: error.message });
+  }
+});
+
+// GET /v1/appsflyer/installs - Get install data
+app.get('/v1/appsflyer/installs', async (req, res) => {
+  try {
+    if (!APPSFLYER_API_TOKEN) {
+      return res.status(503).json({ error: 'AppsFlyer not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const from = startDate.toISOString().split('T')[0];
+    const to = endDate.toISOString().split('T')[0];
+
+    // Daily installs report
+    const response = await fetch(
+      `https://hq1.appsflyer.com/api/agg-data/export/app/${APPSFLYER_APP_ID}/daily_report/v5?from=${from}&to=${to}&timezone=UTC`,
+      {
+        headers: {
+          'Authorization': `Bearer ${APPSFLYER_API_TOKEN}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'AppsFlyer API error', message: errorText });
+    }
+
+    const csvData = await response.text();
+
+    // Parse CSV to JSON
+    const lines = csvData.trim().split('\n');
+    if (lines.length < 2) {
+      return res.json({ configured: true, installs: [], date_range: { from, to } });
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const data = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = values[i]; });
+      return obj;
+    });
+
+    res.json({
+      configured: true,
+      installs: data,
+      date_range: { from, to }
+    });
+  } catch (error) {
+    console.error('Error fetching AppsFlyer installs:', error);
+    res.status(500).json({ error: 'Failed to fetch install data', message: error.message });
+  }
+});
+
+// GET /v1/appsflyer/sources - Get media source breakdown
+app.get('/v1/appsflyer/sources', async (req, res) => {
+  try {
+    if (!APPSFLYER_API_TOKEN) {
+      return res.status(503).json({ error: 'AppsFlyer not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const from = startDate.toISOString().split('T')[0];
+    const to = endDate.toISOString().split('T')[0];
+
+    // Media source report
+    const response = await fetch(
+      `https://hq1.appsflyer.com/api/agg-data/export/app/${APPSFLYER_APP_ID}/partners_by_date_report/v5?from=${from}&to=${to}&timezone=UTC&groupings=pid,c`,
+      {
+        headers: {
+          'Authorization': `Bearer ${APPSFLYER_API_TOKEN}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'AppsFlyer API error', message: errorText });
+    }
+
+    const csvData = await response.text();
+
+    // Parse CSV to JSON
+    const lines = csvData.trim().split('\n');
+    if (lines.length < 2) {
+      return res.json({ configured: true, sources: [], date_range: { from, to } });
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const data = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = values[i]; });
+      return obj;
+    });
+
+    res.json({
+      configured: true,
+      sources: data,
+      date_range: { from, to }
+    });
+  } catch (error) {
+    console.error('Error fetching AppsFlyer sources:', error);
+    res.status(500).json({ error: 'Failed to fetch source data', message: error.message });
+  }
+});
+
+// GET /v1/appsflyer/revenue - Get revenue/ROAS data
+app.get('/v1/appsflyer/revenue', async (req, res) => {
+  try {
+    if (!APPSFLYER_API_TOKEN) {
+      return res.status(503).json({ error: 'AppsFlyer not configured', configured: false });
+    }
+
+    const { startDate, endDate } = getDateRange(req.query);
+    const from = startDate.toISOString().split('T')[0];
+    const to = endDate.toISOString().split('T')[0];
+
+    // Revenue report with ROAS
+    const response = await fetch(
+      `https://hq1.appsflyer.com/api/agg-data/export/app/${APPSFLYER_APP_ID}/partners_report/v5?from=${from}&to=${to}&timezone=UTC&kpis=revenue,roi`,
+      {
+        headers: {
+          'Authorization': `Bearer ${APPSFLYER_API_TOKEN}`,
+          'Accept': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'AppsFlyer API error', message: errorText });
+    }
+
+    const csvData = await response.text();
+
+    // Parse CSV to JSON
+    const lines = csvData.trim().split('\n');
+    if (lines.length < 2) {
+      return res.json({ configured: true, revenue: [], date_range: { from, to } });
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const data = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = values[i]; });
+      return obj;
+    });
+
+    res.json({
+      configured: true,
+      revenue: data,
+      date_range: { from, to }
+    });
+  } catch (error) {
+    console.error('Error fetching AppsFlyer revenue:', error);
+    res.status(500).json({ error: 'Failed to fetch revenue data', message: error.message });
+  }
+});
+
+// ============================================
+// SENTRY API INTEGRATION
+// ============================================
+
+// GET /v1/sentry/overview - Get Sentry error overview
+app.get('/v1/sentry/overview', async (req, res) => {
+  try {
+    if (!SENTRY_AUTH_TOKEN) {
+      return res.status(503).json({ error: 'Sentry not configured', configured: false });
+    }
+
+    const { days = 14 } = req.query;
+
+    const [issuesResponse, statsResponse] = await Promise.all([
+      // Get recent issues
+      fetch(
+        `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=is:unresolved&statsPeriod=${days}d&limit=25`,
+        { headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` } }
+      ),
+      // Get project stats
+      fetch(
+        `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/stats/?stat=received&resolution=1d&statsPeriod=${days}d`,
+        { headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` } }
+      )
+    ]);
+
+    if (!issuesResponse.ok) {
+      const errorText = await issuesResponse.text();
+      console.error('Sentry issues API error:', issuesResponse.status, errorText);
+      return res.status(issuesResponse.status).json({
+        error: 'Sentry API error',
+        message: errorText
+      });
+    }
+
+    const [issues, stats] = await Promise.all([
+      issuesResponse.json(),
+      statsResponse.ok ? statsResponse.json() : []
+    ]);
+
+    // Calculate summary stats
+    const totalEvents = stats.reduce((sum, [_, count]) => sum + count, 0);
+    const criticalIssues = issues.filter(i => i.level === 'fatal' || i.level === 'error').length;
+
+    res.json({
+      configured: true,
+      summary: {
+        total_events: totalEvents,
+        unresolved_issues: issues.length,
+        critical_issues: criticalIssues,
+        period_days: parseInt(days)
+      },
+      issues: issues.map(i => ({
+        id: i.id,
+        title: i.title,
+        culprit: i.culprit,
+        level: i.level,
+        status: i.status,
+        count: i.count,
+        user_count: i.userCount,
+        first_seen: i.firstSeen,
+        last_seen: i.lastSeen,
+        short_id: i.shortId,
+        permalink: i.permalink
+      })),
+      events_by_day: stats.map(([timestamp, count]) => ({
+        date: new Date(timestamp * 1000).toISOString().split('T')[0],
+        count
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching Sentry data:', error);
+    res.status(500).json({ error: 'Failed to fetch Sentry data', message: error.message });
+  }
+});
+
+// GET /v1/sentry/issues - Get detailed issue list
+app.get('/v1/sentry/issues', async (req, res) => {
+  try {
+    if (!SENTRY_AUTH_TOKEN) {
+      return res.status(503).json({ error: 'Sentry not configured', configured: false });
+    }
+
+    const { query = 'is:unresolved', limit = 50, cursor } = req.query;
+
+    let url = `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=${encodeURIComponent(query)}&limit=${limit}`;
+    if (cursor) url += `&cursor=${cursor}`;
+
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'Sentry API error', message: errorText });
+    }
+
+    const issues = await response.json();
+    const linkHeader = response.headers.get('Link');
+
+    res.json({
+      configured: true,
+      issues: issues.map(i => ({
+        id: i.id,
+        title: i.title,
+        culprit: i.culprit,
+        level: i.level,
+        status: i.status,
+        count: i.count,
+        user_count: i.userCount,
+        first_seen: i.firstSeen,
+        last_seen: i.lastSeen,
+        short_id: i.shortId,
+        permalink: i.permalink,
+        metadata: i.metadata
+      })),
+      pagination: {
+        link: linkHeader
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching Sentry issues:', error);
+    res.status(500).json({ error: 'Failed to fetch issues', message: error.message });
+  }
+});
+
+// GET /v1/sentry/issue/:issue_id - Get specific issue details
+app.get('/v1/sentry/issue/:issue_id', async (req, res) => {
+  try {
+    if (!SENTRY_AUTH_TOKEN) {
+      return res.status(503).json({ error: 'Sentry not configured', configured: false });
+    }
+
+    const { issue_id } = req.params;
+
+    const [issueResponse, eventsResponse] = await Promise.all([
+      fetch(`https://sentry.io/api/0/issues/${issue_id}/`, {
+        headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` }
+      }),
+      fetch(`https://sentry.io/api/0/issues/${issue_id}/events/?limit=10`, {
+        headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` }
+      })
+    ]);
+
+    if (!issueResponse.ok) {
+      return res.status(issueResponse.status).json({ error: 'Issue not found' });
+    }
+
+    const [issue, events] = await Promise.all([
+      issueResponse.json(),
+      eventsResponse.ok ? eventsResponse.json() : []
+    ]);
+
+    res.json({
+      configured: true,
+      issue: {
+        id: issue.id,
+        title: issue.title,
+        culprit: issue.culprit,
+        level: issue.level,
+        status: issue.status,
+        count: issue.count,
+        user_count: issue.userCount,
+        first_seen: issue.firstSeen,
+        last_seen: issue.lastSeen,
+        short_id: issue.shortId,
+        permalink: issue.permalink,
+        metadata: issue.metadata,
+        type: issue.type
+      },
+      recent_events: events.map(e => ({
+        id: e.eventID,
+        timestamp: e.dateCreated,
+        message: e.message,
+        tags: e.tags,
+        context: e.context,
+        user: e.user
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching Sentry issue:', error);
+    res.status(500).json({ error: 'Failed to fetch issue details', message: error.message });
+  }
+});
+
+// GET /v1/sentry/crashes - Get crash-free rate and sessions
+app.get('/v1/sentry/crashes', async (req, res) => {
+  try {
+    if (!SENTRY_AUTH_TOKEN) {
+      return res.status(503).json({ error: 'Sentry not configured', configured: false });
+    }
+
+    const { days = 14 } = req.query;
+
+    // Get session data for crash-free rate
+    const response = await fetch(
+      `https://sentry.io/api/0/organizations/${SENTRY_ORG}/sessions/?project=${SENTRY_PROJECT}&field=sum(session)&field=crash_free_rate(session)&statsPeriod=${days}d&interval=1d`,
+      { headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` } }
+    );
+
+    if (!response.ok) {
+      // Sessions API might not be available for all plans
+      return res.json({
+        configured: true,
+        available: false,
+        message: 'Session data requires Sentry Team plan or higher'
+      });
+    }
+
+    const data = await response.json();
+
+    res.json({
+      configured: true,
+      available: true,
+      sessions: data.groups || [],
+      intervals: data.intervals || []
+    });
+  } catch (error) {
+    console.error('Error fetching Sentry crash data:', error);
+    res.status(500).json({ error: 'Failed to fetch crash data', message: error.message });
+  }
+});
+
+// ============================================
+// UNIFIED INTEGRATIONS STATUS
+// ============================================
+
+// GET /v1/integrations/status - Check status of all integrations
+app.get('/v1/integrations/status', async (req, res) => {
+  const status = {
+    revenuecat: {
+      configured: true, // Always configured via webhooks
+      status: 'active'
+    },
+    amplitude: {
+      configured: !!(AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY),
+      status: AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY ? 'active' : 'not_configured'
+    },
+    appsflyer: {
+      configured: !!APPSFLYER_API_TOKEN,
+      status: APPSFLYER_API_TOKEN ? 'active' : 'not_configured',
+      app_id: APPSFLYER_APP_ID
+    },
+    sentry: {
+      configured: !!SENTRY_AUTH_TOKEN,
+      status: SENTRY_AUTH_TOKEN ? 'active' : 'not_configured',
+      org: SENTRY_ORG,
+      project: SENTRY_PROJECT
+    }
+  };
+
+  // Test each integration if configured
+  const tests = [];
+
+  if (status.amplitude.configured) {
+    tests.push(
+      fetch('https://amplitude.com/api/2/users?start=20240101&end=20240102', {
+        headers: { 'Authorization': `Basic ${Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64')}` }
+      }).then(r => { status.amplitude.status = r.ok ? 'active' : 'error'; })
+        .catch(() => { status.amplitude.status = 'error'; })
+    );
+  }
+
+  if (status.sentry.configured) {
+    tests.push(
+      fetch(`https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/`, {
+        headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` }
+      }).then(r => { status.sentry.status = r.ok ? 'active' : 'error'; })
+        .catch(() => { status.sentry.status = 'error'; })
+    );
+  }
+
+  await Promise.all(tests);
+
+  res.json(status);
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Analytics API running on port ${PORT}`);
+  console.log(`Integrations: Amplitude=${!!AMPLITUDE_API_KEY}, AppsFlyer=${!!APPSFLYER_API_TOKEN}, Sentry=${!!SENTRY_AUTH_TOKEN}`);
 });
 
 module.exports = app;
