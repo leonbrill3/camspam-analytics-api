@@ -165,6 +165,8 @@
             border-radius: 12px;
             padding: 4px;
             border: 1px solid var(--border-color);
+            align-items: center;
+            gap: 4px;
         }
 
         .time-filter button {
@@ -186,6 +188,41 @@
 
         .time-filter button:hover:not(.active) {
             background: rgba(255,255,255,0.1);
+        }
+
+        .date-picker-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 8px;
+            padding-left: 8px;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .date-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px 10px;
+            color: var(--text-primary);
+            font-size: 12px;
+            width: 110px;
+            outline: none;
+        }
+
+        .date-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .date-input::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            cursor: pointer;
+        }
+
+        .date-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
         }
 
         .refresh-btn {
@@ -249,6 +286,33 @@
         .stat-card:hover {
             transform: translateY(-4px);
             box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        }
+
+        .stat-card.clickable {
+            cursor: pointer;
+        }
+
+        .stat-card.clickable:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .stat-card.clickable::after {
+            content: '→';
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 16px;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .stat-card.clickable:hover::after {
+            opacity: 1;
+        }
+
+        .stat-card {
+            position: relative;
         }
 
         .stat-card.revenue {
@@ -368,6 +432,54 @@
             display: flex;
             align-items: center;
             gap: 16px;
+        }
+
+        .funnel-step.clickable {
+            cursor: pointer;
+            padding: 8px;
+            margin: -8px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+
+        .funnel-step.clickable:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .funnel-dropoff {
+            text-align: center;
+            font-size: 11px;
+            color: var(--accent-red);
+            padding: 4px 0;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .funnel-dropoff:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        .clickable-link {
+            cursor: pointer;
+            color: var(--accent-blue);
+            transition: all 0.2s;
+        }
+
+        .clickable-link:hover {
+            text-decoration: underline;
+            color: var(--accent-purple);
+        }
+
+        .event-breakdown-item.clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .event-breakdown-item.clickable:hover {
+            background: rgba(255,255,255,0.08);
+            transform: scale(1.02);
         }
 
         .funnel-bar-container {
@@ -1018,9 +1130,17 @@
                             <span id="lastUpdate">Updating...</span>
                         </div>
                         <div class="time-filter">
+                            <button data-days="1">1D</button>
                             <button data-days="7" class="active">7D</button>
                             <button data-days="30">30D</button>
                             <button data-days="90">90D</button>
+                            <div class="date-picker-container">
+                                <span class="date-label">From</span>
+                                <input type="date" id="startDate" class="date-input">
+                                <span class="date-label">To</span>
+                                <input type="date" id="endDate" class="date-input">
+                                <button id="applyDateRange" class="refresh-btn" style="padding: 6px 12px; font-size: 12px;">Apply</button>
+                            </div>
                         </div>
                         <button class="refresh-btn" onclick="refreshAll()">
                             <span>Refresh</span>
@@ -1030,32 +1150,32 @@
 
                 <!-- Top Stats -->
                 <div class="stats-grid">
-                    <div class="stat-card users">
+                    <div class="stat-card users clickable" onclick="drillDown('users')">
                         <div class="stat-label">👥 Total Users</div>
                         <div class="stat-value" id="totalUsers">-</div>
                         <div class="stat-change neutral" id="usersChange">Loading...</div>
                     </div>
-                    <div class="stat-card events">
+                    <div class="stat-card events clickable" onclick="drillDown('events')">
                         <div class="stat-label">📊 Total Events</div>
                         <div class="stat-value" id="totalEvents">-</div>
                         <div class="stat-change neutral" id="eventsChange">Loading...</div>
                     </div>
-                    <div class="stat-card photos">
+                    <div class="stat-card photos clickable" onclick="drillDown('event', 'photo_captured')">
                         <div class="stat-label">📸 Photos Captured</div>
                         <div class="stat-value" id="photosCaptured">-</div>
                         <div class="stat-change neutral" id="photosChange">Loading...</div>
                     </div>
-                    <div class="stat-card revenue">
+                    <div class="stat-card revenue clickable" onclick="drillDown('event', 'purchase_completed')">
                         <div class="stat-label">💰 Revenue</div>
                         <div class="stat-value" id="totalRevenue">$0</div>
                         <div class="stat-change neutral" id="revenueChange">Loading...</div>
                     </div>
-                    <div class="stat-card conversion">
+                    <div class="stat-card conversion clickable" onclick="drillDown('event', 'subscription_started')">
                         <div class="stat-label">🎯 Conversion Rate</div>
                         <div class="stat-value" id="conversionRate">0%</div>
                         <div class="stat-change neutral">Paywall → Purchase</div>
                     </div>
-                    <div class="stat-card retention">
+                    <div class="stat-card retention clickable" onclick="drillDown('retention')">
                         <div class="stat-label">🔄 D7 Retention</div>
                         <div class="stat-value" id="d7Retention">-</div>
                         <div class="stat-change neutral">Week 1 retention</div>
@@ -1623,7 +1743,9 @@
                     <header class="page-header">
                         <div>
                             <h1 class="page-title">Individual Users</h1>
-                            <p class="page-subtitle">See each user's complete behavior and journey</p>
+                            <p class="page-subtitle">
+                                <span id="userFilterLabel">All Users</span> · <span id="userCount">0 users</span>
+                            </p>
                         </div>
                     </header>
 
@@ -1831,6 +1953,9 @@
         // Configuration
         const API_BASE = window.location.origin;
         let currentDays = 7;
+        let customStartDate = null;
+        let customEndDate = null;
+        let useCustomDates = false;
         let charts = {};
         let currentPage = 'overview';
 
@@ -1852,15 +1977,41 @@
             // Auto-refresh every 30 seconds
             setInterval(refreshAll, 30000);
 
-            // Time filter buttons
-            document.querySelectorAll('.time-filter button').forEach(btn => {
+            // Time filter buttons (excluding apply button)
+            document.querySelectorAll('.time-filter button[data-days]').forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.time-filter button').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.time-filter button[data-days]').forEach(b => b.classList.remove('active'));
                     e.target.classList.add('active');
                     currentDays = parseInt(e.target.dataset.days);
+                    useCustomDates = false;
+                    document.getElementById('startDate').value = '';
+                    document.getElementById('endDate').value = '';
                     refreshAll();
                 });
             });
+
+            // Custom date range picker
+            const applyDateBtn = document.getElementById('applyDateRange');
+            applyDateBtn.addEventListener('click', () => {
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                if (startDate && endDate) {
+                    customStartDate = startDate;
+                    customEndDate = endDate;
+                    useCustomDates = true;
+                    document.querySelectorAll('.time-filter button[data-days]').forEach(b => b.classList.remove('active'));
+                    refreshAll();
+                } else {
+                    alert('Please select both start and end dates');
+                }
+            });
+
+            // Set default date values
+            const today = new Date().toISOString().split('T')[0];
+            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            document.getElementById('endDate').value = today;
+            document.getElementById('startDate').value = weekAgo;
         });
 
         function initNavigation() {
@@ -1901,29 +2052,140 @@
                 plugins: { legend: { position: 'right', labels: { padding: 12, font: { size: 11 } } } }
             };
 
+            // Click handler for DAU chart - drill down to users active on that date
+            const dauClickOptions = {
+                ...chartOptions,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const dateLabel = charts.dau.data.labels[index];
+                        drillDown('date', dateLabel);
+                    }
+                }
+            };
+
+            // Click handler for top events chart - drill down to users who triggered that event
+            const eventsClickOptions = {
+                ...chartOptions,
+                indexAxis: 'y',
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const eventName = charts.topEvents.data.labels[index];
+                        drillDown('event', eventName);
+                    }
+                }
+            };
+
+            // Click handler for tier chart - drill down to users on that tier
+            const tierClickOptions = {
+                ...doughnutOptions,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const tier = charts.tier.data.labels[index].toLowerCase();
+                        drillDown('tier', tier);
+                    }
+                }
+            };
+
+            // Click handler for country chart - drill down to users from that country
+            const countryClickOptions = {
+                ...doughnutOptions,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const country = charts.country.data.labels[index];
+                        drillDown('country', country);
+                    }
+                }
+            };
+
+            // Click handler for device chart - drill down to users with that device
+            const deviceClickOptions = {
+                ...chartOptions,
+                indexAxis: 'y',
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const device = charts.devices.data.labels[index];
+                        drillDown('device', device);
+                    }
+                }
+            };
+
+            // Click handler for revenue chart - drill down to purchases on that date
+            const revenueClickOptions = {
+                ...chartOptions,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const dateLabel = charts.revenue.data.labels[index];
+                        drillDown('event', 'purchase_completed');
+                    }
+                }
+            };
+
+            // Click handler for language chart - drill down to users by language
+            const languageClickOptions = {
+                ...chartOptions,
+                indexAxis: 'y',
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const language = charts.language.data.labels[index];
+                        drillDown('language', language);
+                    }
+                }
+            };
+
+            // Click handler for OS chart - drill down to users by OS
+            const osClickOptions = {
+                ...doughnutOptions,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const os = charts.os.data.labels[index];
+                        drillDown('os', os);
+                    }
+                }
+            };
+
+            // Click handler for subscription plan chart - drill down to users by plan
+            const planClickOptions = {
+                ...doughnutOptions,
+                onClick: (event, elements) => {
+                    if (elements.length > 0) {
+                        const index = elements[0].index;
+                        const plan = charts.revenuePlan.data.labels[index];
+                        drillDown('plan', plan);
+                    }
+                }
+            };
+
             // Overview Charts
             charts.dau = new Chart(document.getElementById('dauChart'), {
                 type: 'line',
                 data: { labels: [], datasets: [{ label: 'Users', data: [], borderColor: '#60a5fa', backgroundColor: 'rgba(96, 165, 250, 0.1)', fill: true, tension: 0.4 }] },
-                options: chartOptions
+                options: dauClickOptions
             });
 
             charts.revenue = new Chart(document.getElementById('revenueChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [{ label: 'Revenue', data: [], backgroundColor: 'rgba(16, 185, 129, 0.6)', borderRadius: 4 }] },
-                options: chartOptions
+                options: revenueClickOptions
             });
 
             charts.topEvents = new Chart(document.getElementById('topEventsChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [{ label: 'Count', data: [], backgroundColor: ['rgba(102, 126, 234, 0.7)', 'rgba(118, 75, 162, 0.7)', 'rgba(168, 85, 247, 0.7)', 'rgba(236, 72, 153, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(59, 130, 246, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(234, 179, 8, 0.7)', 'rgba(20, 184, 166, 0.7)'], borderRadius: 4 }] },
-                options: { ...chartOptions, indexAxis: 'y' }
+                options: eventsClickOptions
             });
 
             charts.tier = new Chart(document.getElementById('tierChart'), {
                 type: 'doughnut',
                 data: { labels: ['Free', 'Pro', 'Max'], datasets: [{ data: [0, 0, 0], backgroundColor: ['rgba(107, 114, 128, 0.8)', 'rgba(59, 130, 246, 0.8)', 'rgba(168, 85, 247, 0.8)'], borderWidth: 0 }] },
-                options: doughnutOptions
+                options: tierClickOptions
             });
 
             // Acquisition Charts
@@ -1936,20 +2198,20 @@
             charts.devices = new Chart(document.getElementById('devicesChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [{ label: 'Devices', data: [], backgroundColor: 'rgba(168, 85, 247, 0.6)', borderRadius: 4 }] },
-                options: { ...chartOptions, indexAxis: 'y' }
+                options: deviceClickOptions
             });
 
             // Geographic Charts
             charts.country = new Chart(document.getElementById('countryChart'), {
                 type: 'doughnut',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(249, 115, 22, 0.8)', 'rgba(168, 85, 247, 0.8)', 'rgba(236, 72, 153, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(234, 179, 8, 0.8)', 'rgba(20, 184, 166, 0.8)'], borderWidth: 0 }] },
-                options: doughnutOptions
+                options: countryClickOptions
             });
 
             charts.language = new Chart(document.getElementById('languageChart'), {
                 type: 'bar',
                 data: { labels: [], datasets: [{ label: 'Users', data: [], backgroundColor: 'rgba(16, 185, 129, 0.6)', borderRadius: 4 }] },
-                options: { ...chartOptions, indexAxis: 'y' }
+                options: languageClickOptions
             });
 
             charts.timezone = new Chart(document.getElementById('timezoneChart'), {
@@ -1961,7 +2223,7 @@
             charts.os = new Chart(document.getElementById('osChart'), {
                 type: 'doughnut',
                 data: { labels: [], datasets: [{ data: [], backgroundColor: ['rgba(102, 126, 234, 0.8)', 'rgba(118, 75, 162, 0.8)', 'rgba(168, 85, 247, 0.8)', 'rgba(139, 92, 246, 0.8)', 'rgba(99, 102, 241, 0.8)'], borderWidth: 0 }] },
-                options: doughnutOptions
+                options: osClickOptions
             });
 
             // Engagement Charts
@@ -1993,7 +2255,7 @@
             charts.revenuePlan = new Chart(document.getElementById('revenuePlanChart'), {
                 type: 'doughnut',
                 data: { labels: ['Pro Monthly', 'Pro Yearly', 'Max Monthly', 'Max Yearly'], datasets: [{ data: [0, 0, 0, 0], backgroundColor: ['rgba(59, 130, 246, 0.8)', 'rgba(37, 99, 235, 0.8)', 'rgba(168, 85, 247, 0.8)', 'rgba(139, 92, 246, 0.8)'], borderWidth: 0 }] },
-                options: doughnutOptions
+                options: planClickOptions
             });
 
             charts.subscribers = new Chart(document.getElementById('subscribersChart'), {
@@ -2035,6 +2297,85 @@
             });
         }
 
+        // Helper to build API URLs with date params
+        function getDateParams() {
+            if (useCustomDates && customStartDate && customEndDate) {
+                return `startDate=${customStartDate}&endDate=${customEndDate}`;
+            }
+            return `days=${currentDays}`;
+        }
+
+        // Drill down to users page with filter
+        function drillDown(type, value = null) {
+            // Navigate to users page
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            const usersNav = document.querySelector('[data-page="users"]');
+            usersNav.classList.add('active');
+
+            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-users').classList.add('active');
+            currentPage = 'users';
+
+            // Set filter based on type
+            let endpoint = `${API_BASE}/v1/users?${getDateParams()}`;
+
+            if (type === 'event' && value) {
+                endpoint = `${API_BASE}/v1/users/by-event/${value}?${getDateParams()}`;
+            } else if (type === 'retention') {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&filter=retained`;
+            } else if (type === 'country' && value) {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&country=${value}`;
+            } else if (type === 'tier' && value) {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&tier=${value}`;
+            } else if (type === 'date' && value) {
+                endpoint = `${API_BASE}/v1/users?startDate=${value}&endDate=${value}`;
+            } else if (type === 'device' && value) {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&device=${encodeURIComponent(value)}`;
+            } else if (type === 'language' && value) {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&language=${encodeURIComponent(value)}`;
+            } else if (type === 'os' && value) {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&os=${encodeURIComponent(value)}`;
+            } else if (type === 'plan' && value) {
+                endpoint = `${API_BASE}/v1/users?${getDateParams()}&plan=${encodeURIComponent(value)}`;
+            }
+
+            // Update URL hash for deep linking
+            window.location.hash = type === 'users' ? 'users' : `users/${type}${value ? '/' + encodeURIComponent(value) : ''}`;
+
+            // Fetch filtered users
+            fetchFilteredUsers(endpoint, type, value);
+        }
+
+        async function fetchFilteredUsers(endpoint, filterType, filterValue) {
+            try {
+                const userListContainer = document.getElementById('user-list');
+                userListContainer.innerHTML = '<div class="loading">Loading users...</div>';
+
+                const res = await fetch(endpoint);
+                const data = await res.json();
+
+                const users = data.users || data;
+                const filterLabel = filterType === 'event' ? `Event: ${filterValue}` :
+                                   filterType === 'country' ? `Country: ${filterValue}` :
+                                   filterType === 'tier' ? `Tier: ${filterValue}` :
+                                   filterType === 'device' ? `Device: ${filterValue}` :
+                                   filterType === 'retention' ? 'Retained Users' :
+                                   filterType === 'date' ? `Active on: ${filterValue}` :
+                                   filterType === 'language' ? `Language: ${filterValue}` :
+                                   filterType === 'os' ? `OS: ${filterValue}` :
+                                   filterType === 'plan' ? `Plan: ${filterValue}` :
+                                   'All Users';
+
+                document.getElementById('userFilterLabel').textContent = filterLabel;
+                document.getElementById('userCount').textContent = `${users.length} users`;
+
+                renderUserList(users);
+            } catch (error) {
+                console.error('Error fetching filtered users:', error);
+                document.getElementById('user-list').innerHTML = '<div class="error">Error loading users</div>';
+            }
+        }
+
         async function refreshAll() {
             try {
                 await Promise.all([
@@ -2055,7 +2396,7 @@
 
         async function fetchOverview() {
             try {
-                const res = await fetch(`${API_BASE}/v1/stats/overview?days=${currentDays}`);
+                const res = await fetch(`${API_BASE}/v1/stats/overview?${getDateParams()}`);
                 const data = await res.json();
 
                 // Stats
@@ -2090,7 +2431,7 @@
 
         async function fetchUsers() {
             try {
-                const res = await fetch(`${API_BASE}/v1/stats/users?days=${currentDays}`);
+                const res = await fetch(`${API_BASE}/v1/stats/users?${getDateParams()}`);
                 const data = await res.json();
 
                 // Tier chart
@@ -2134,7 +2475,7 @@
 
         async function fetchFeatures() {
             try {
-                const res = await fetch(`${API_BASE}/v1/stats/features?days=${currentDays}`);
+                const res = await fetch(`${API_BASE}/v1/stats/features?${getDateParams()}`);
                 const data = await res.json();
 
                 // Photos captured
@@ -2196,7 +2537,7 @@
 
         async function fetchFunnel() {
             try {
-                const res = await fetch(`${API_BASE}/v1/stats/funnel?days=${currentDays}`);
+                const res = await fetch(`${API_BASE}/v1/stats/funnel?${getDateParams()}`);
                 const data = await res.json();
 
                 renderFunnel('funnelContainer', data.funnel);
@@ -2233,12 +2574,21 @@
             }
 
             const maxUsers = funnel[0].users;
-            container.innerHTML = funnel.map(step => {
+            container.innerHTML = funnel.map((step, index) => {
                 const width = maxUsers > 0 ? (step.users / maxUsers * 100) : 0;
                 const rate = parseFloat(step.conversion_rate);
                 const rateClass = rate >= 50 ? 'good' : rate >= 20 ? 'ok' : 'bad';
+                const prevStep = index > 0 ? funnel[index - 1] : null;
+                const dropoff = prevStep ? prevStep.users - step.users : 0;
+
+                let dropoffHtml = '';
+                if (index > 0 && dropoff > 0) {
+                    dropoffHtml = `<div class="funnel-dropoff" onclick="drillDownFunnelDropoff('${prevStep.step}', '${step.step}')" title="Click to see who dropped off">↓ ${formatNumber(dropoff)} dropped</div>`;
+                }
+
                 return `
-                    <div class="funnel-step">
+                    ${dropoffHtml}
+                    <div class="funnel-step clickable" onclick="drillDown('event', '${step.step}')" title="Click to see users">
                         <div class="funnel-label">${formatEventName(step.step)}</div>
                         <div class="funnel-bar-container">
                             <div class="funnel-bar" style="width: ${Math.max(width, 10)}%">
@@ -2249,6 +2599,38 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        // Drill down to users who dropped off between funnel steps
+        async function drillDownFunnelDropoff(completedStep, notCompletedStep) {
+            // Navigate to users page
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            const usersNav = document.querySelector('[data-page="users"]');
+            usersNav.classList.add('active');
+
+            document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-users').classList.add('active');
+            currentPage = 'users';
+
+            const endpoint = `${API_BASE}/v1/users/funnel-dropoff?completed=${completedStep}&notCompleted=${notCompletedStep}&${getDateParams()}`;
+            window.location.hash = `users/dropoff/${completedStep}/${notCompletedStep}`;
+
+            try {
+                const userListContainer = document.getElementById('userTableBody');
+                userListContainer.innerHTML = '<tr><td colspan="8" class="empty-state-text">Loading dropped users...</td></tr>';
+
+                const res = await fetch(endpoint);
+                const data = await res.json();
+
+                const users = data.users || data;
+                document.getElementById('userFilterLabel').textContent = `Dropped: ${formatEventName(completedStep)} → ${formatEventName(notCompletedStep)}`;
+                document.getElementById('userCount').textContent = `${users.length} users`;
+
+                renderUserList(users);
+            } catch (error) {
+                console.error('Error fetching dropoff users:', error);
+                document.getElementById('userTableBody').innerHTML = '<tr><td colspan="8" class="empty-state-text">Error loading users</td></tr>';
+            }
         }
 
         async function fetchRealtime() {
@@ -2306,7 +2688,7 @@
 
         async function fetchAcquisition() {
             try {
-                const res = await fetch(`${API_BASE}/v1/stats/acquisition?days=${currentDays}`);
+                const res = await fetch(`${API_BASE}/v1/stats/acquisition?${getDateParams()}`);
                 const data = await res.json();
 
                 // Country chart (locale-based)
@@ -2416,7 +2798,7 @@
 
         async function fetchRetention() {
             try {
-                const res = await fetch(`${API_BASE}/v1/stats/retention?days=${currentDays}`);
+                const res = await fetch(`${API_BASE}/v1/stats/retention?${getDateParams()}`);
                 const data = await res.json();
 
                 if (data.overall?.d1_retention !== undefined) {
@@ -2531,8 +2913,92 @@
         const USERS_PER_PAGE = 50;
         let userSearchTimeout = null;
 
+        // Handle URL hash for deep linking
+        function handleHashChange() {
+            const hash = window.location.hash.slice(1); // Remove #
+            if (!hash) return false;
+
+            const parts = hash.split('/');
+            const page = parts[0];
+
+            if (page === 'users') {
+                // Navigate to users page
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                const usersNav = document.querySelector('[data-page="users"]');
+                if (usersNav) usersNav.classList.add('active');
+
+                document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+                document.getElementById('page-users').classList.add('active');
+                currentPage = 'users';
+
+                if (parts[1]) {
+                    const type = parts[1];
+                    const value = parts[2] ? decodeURIComponent(parts[2]) : null;
+
+                    if (type === 'detail' && value) {
+                        // Show user detail
+                        showUserDetail(value);
+                    } else if (type === 'dropoff' && parts[2] && parts[3]) {
+                        // Handle funnel dropoff: users/dropoff/step1/step2
+                        drillDownFunnelDropoff(parts[2], parts[3]);
+                    } else {
+                        // Show filtered users
+                        let endpoint = `${API_BASE}/v1/users?${getDateParams()}`;
+
+                        if (type === 'event' && value) {
+                            endpoint = `${API_BASE}/v1/users/by-event/${value}?${getDateParams()}`;
+                        } else if (type === 'country' && value) {
+                            endpoint = `${API_BASE}/v1/users?${getDateParams()}&country=${value}`;
+                        } else if (type === 'tier' && value) {
+                            endpoint = `${API_BASE}/v1/users?${getDateParams()}&tier=${value}`;
+                        } else if (type === 'date' && value) {
+                            endpoint = `${API_BASE}/v1/users?startDate=${value}&endDate=${value}`;
+                        } else if (type === 'device' && value) {
+                            endpoint = `${API_BASE}/v1/users?${getDateParams()}&device=${encodeURIComponent(value)}`;
+                        } else if (type === 'language' && value) {
+                            endpoint = `${API_BASE}/v1/users?${getDateParams()}&language=${encodeURIComponent(value)}`;
+                        } else if (type === 'os' && value) {
+                            endpoint = `${API_BASE}/v1/users?${getDateParams()}&os=${encodeURIComponent(value)}`;
+                        } else if (type === 'plan' && value) {
+                            endpoint = `${API_BASE}/v1/users?${getDateParams()}&plan=${encodeURIComponent(value)}`;
+                        }
+
+                        fetchFilteredUsers(endpoint, type, value);
+                    }
+                } else {
+                    // Just users page, no filter
+                    fetchUsersList();
+                }
+                return true;
+            }
+
+            // Handle other pages
+            const validPages = ['overview', 'acquisition', 'engagement', 'monetization', 'product', 'realtime', 'settings'];
+            if (validPages.includes(page)) {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                const nav = document.querySelector(`[data-page="${page}"]`);
+                if (nav) nav.classList.add('active');
+
+                document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+                const pageEl = document.getElementById(`page-${page}`);
+                if (pageEl) pageEl.classList.add('active');
+                currentPage = page;
+                return true;
+            }
+
+            return false;
+        }
+
+        // Listen for hash changes (back/forward navigation)
+        window.addEventListener('hashchange', handleHashChange);
+
         // Initialize users page controls
         document.addEventListener('DOMContentLoaded', () => {
+            // Handle initial URL hash
+            if (!handleHashChange()) {
+                // No valid hash, show default page
+            }
+
             // Search input with debounce
             document.getElementById('userSearch').addEventListener('input', (e) => {
                 clearTimeout(userSearchTimeout);
@@ -2621,6 +3087,32 @@
             `).join('');
         }
 
+        // Render user list from filtered data (for drillDown)
+        function renderUserList(users) {
+            const tbody = document.getElementById('userTableBody');
+
+            if (!users?.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state-text">No users found</td></tr>';
+                document.getElementById('paginationInfo').textContent = 'No users';
+                return;
+            }
+
+            tbody.innerHTML = users.map(user => `
+                <tr onclick="showUserDetail('${user.device_id}')">
+                    <td style="font-family: monospace; font-size: 12px;">${user.device_id.substring(0, 16)}...</td>
+                    <td><span class="user-status ${user.user_status || user.status || 'active'}">${user.user_status || user.status || 'active'}</span></td>
+                    <td>${formatDateTime(user.first_seen)}</td>
+                    <td>${formatDateTime(user.last_active)}</td>
+                    <td>${formatNumber(user.total_events || user.event_count || 0)}</td>
+                    <td>${user.total_sessions || user.session_count || '-'}</td>
+                    <td>${user.photos_captured || '-'}</td>
+                    <td>${(user.total_revenue || user.revenue) > 0 ? formatCurrency(user.total_revenue || user.revenue) : '-'}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('paginationInfo').textContent = `Showing ${users.length} users`;
+        }
+
         function updatePagination() {
             const info = document.getElementById('paginationInfo');
             const prevBtn = document.getElementById('prevPage');
@@ -2651,6 +3143,9 @@
             // Hide list, show detail
             document.getElementById('users-list-view').style.display = 'none';
             document.getElementById('users-detail-view').style.display = 'block';
+
+            // Update URL for deep linking (don't trigger hashchange)
+            history.pushState(null, '', `#users/detail/${encodeURIComponent(deviceId)}`);
 
             // Show loading state
             document.getElementById('detailUserTitle').textContent = 'Loading...';
@@ -2684,15 +3179,20 @@
             const totalSpend = purchases?.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0) || 0;
             document.getElementById('detailTotalSpend').textContent = formatCurrency(totalSpend);
 
-            // Device info
+            // Device info - with cross-links to find similar users
+            const deviceModel = user.device?.model || '';
+            const osVersion = user.device?.os_version || '';
+            const locale = user.device?.locale || '';
+            const timezone = user.device?.timezone || '';
+
             document.getElementById('detailDeviceInfo').innerHTML = `
                 <div class="info-item">
                     <span class="info-item-label">Model</span>
-                    <span class="info-item-value">${formatDeviceModel(user.device?.model) || '-'}</span>
+                    <span class="info-item-value clickable-link" onclick="showUserList(); drillDown('device', '${deviceModel}')">${formatDeviceModel(deviceModel) || '-'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-item-label">iOS Version</span>
-                    <span class="info-item-value">${user.device?.os_version || '-'}</span>
+                    <span class="info-item-value clickable-link" onclick="showUserList(); drillDown('os', '${osVersion}')">${osVersion || '-'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-item-label">App Version</span>
@@ -2700,11 +3200,11 @@
                 </div>
                 <div class="info-item">
                     <span class="info-item-label">Locale</span>
-                    <span class="info-item-value">${user.device?.locale || '-'}</span>
+                    <span class="info-item-value clickable-link" onclick="showUserList(); drillDown('language', '${locale}')">${locale || '-'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-item-label">Timezone</span>
-                    <span class="info-item-value">${user.device?.timezone || '-'}</span>
+                    <span class="info-item-value">${timezone || '-'}</span>
                 </div>
             `;
 
@@ -2732,14 +3232,14 @@
                 </div>
             `;
 
-            // Event breakdown
+            // Event breakdown - clickable to see all users with that event
             if (event_breakdown && Object.keys(event_breakdown).length > 0) {
                 const sortedEvents = Object.entries(event_breakdown)
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 12);
 
                 document.getElementById('eventBreakdownGrid').innerHTML = sortedEvents.map(([name, count]) => `
-                    <div class="event-breakdown-item">
+                    <div class="event-breakdown-item clickable" onclick="showUserList(); drillDown('event', '${name}')" title="See all users with ${formatEventName(name)}">
                         <div class="event-breakdown-count">${count}</div>
                         <div class="event-breakdown-name">${formatEventName(name)}</div>
                     </div>
@@ -2766,7 +3266,7 @@
                     '<div class="empty-state-text">No purchases yet</div>';
             }
 
-            // Event timeline
+            // Event timeline - with clickable event names to see all users
             if (events?.length > 0) {
                 document.getElementById('eventTimeline').innerHTML = events.map(e => {
                     const eventClass = e.name?.includes('purchase') || e.name?.includes('subscription') ? 'revenue' :
@@ -2779,7 +3279,7 @@
                         <div class="timeline-event ${eventClass}">
                             <div class="timeline-event-time">${formatDateTime(e.timestamp)}</div>
                             <div class="timeline-event-content">
-                                <div class="timeline-event-name">${getEventIcon(e.name)} ${formatEventName(e.name)}</div>
+                                <div class="timeline-event-name clickable-link" onclick="showUserList(); drillDown('event', '${e.name}')" title="See all users with this event">${getEventIcon(e.name)} ${formatEventName(e.name)}</div>
                                 ${propsStr ? `<div class="timeline-event-props">${propsStr}</div>` : ''}
                             </div>
                         </div>

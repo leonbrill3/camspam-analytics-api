@@ -45,6 +45,27 @@ const limiter = rateLimit({
 });
 app.use('/v1/events', limiter);
 
+// Helper function to parse date range from query params
+function getDateRange(query) {
+  const { days = 30, startDate, endDate } = query;
+
+  if (startDate && endDate) {
+    // Custom date range
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+    return { startDate: start, endDate: end };
+  }
+
+  // Days-based range
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - parseInt(days));
+  start.setHours(0, 0, 0, 0);
+  return { startDate: start, endDate: end };
+}
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -706,9 +727,7 @@ app.post('/v1/events', async (req, res) => {
 // GET /v1/stats/overview - Dashboard overview stats
 app.get('/v1/stats/overview', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { startDate, endDate } = getDateRange(req.query);
 
     const [
       totalUsers,
@@ -721,34 +740,34 @@ app.get('/v1/stats/overview', async (req, res) => {
       pool.query(`
         SELECT COUNT(DISTINCT device_id) as count
         FROM events
-        WHERE timestamp >= $1
-      `, [startDate.toISOString()]),
+        WHERE timestamp >= $1 AND timestamp <= $2
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Daily active users (last 7 days trend)
+      // Daily active users within date range
       pool.query(`
         SELECT DATE(timestamp) as date, COUNT(DISTINCT device_id) as count
         FROM events
-        WHERE timestamp >= NOW() - INTERVAL '7 days'
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY DATE(timestamp)
         ORDER BY date DESC
-      `),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Total events
       pool.query(`
         SELECT COUNT(*) as count
         FROM events
-        WHERE timestamp >= $1
-      `, [startDate.toISOString()]),
+        WHERE timestamp >= $1 AND timestamp <= $2
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Top 10 events by count
       pool.query(`
         SELECT name, COUNT(*) as count
         FROM events
-        WHERE timestamp >= $1
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY name
         ORDER BY count DESC
         LIMIT 10
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Revenue from purchase events
       pool.query(`
@@ -757,8 +776,8 @@ app.get('/v1/stats/overview', async (req, res) => {
           COUNT(*) as purchase_count
         FROM events
         WHERE name = 'purchase_completed'
-        AND timestamp >= $1
-      `, [startDate.toISOString()])
+        AND timestamp >= $1 AND timestamp <= $2
+      `, [startDate.toISOString(), endDate.toISOString()])
     ]);
 
     res.json({
@@ -786,9 +805,7 @@ app.get('/v1/stats/overview', async (req, res) => {
 // GET /v1/stats/users - User analytics
 app.get('/v1/stats/users', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { startDate, endDate } = getDateRange(req.query);
 
     const [
       newUsers,
@@ -801,9 +818,9 @@ app.get('/v1/stats/users', async (req, res) => {
         SELECT DATE(MIN(timestamp)) as first_seen, COUNT(DISTINCT device_id) as count
         FROM events
         GROUP BY device_id
-        HAVING DATE(MIN(timestamp)) >= $1
+        HAVING DATE(MIN(timestamp)) >= $1 AND DATE(MIN(timestamp)) <= $2
         ORDER BY first_seen DESC
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Users by subscription tier
       pool.query(`
@@ -812,9 +829,9 @@ app.get('/v1/stats/users', async (req, res) => {
           COUNT(DISTINCT device_id) as count
         FROM events
         WHERE name IN ('purchase_completed', 'subscription_expired', 'app_opened')
-        AND timestamp >= $1
+        AND timestamp >= $1 AND timestamp <= $2
         GROUP BY COALESCE(properties->>'tier', 'free')
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Session counts per user (engagement proxy)
       pool.query(`
@@ -829,11 +846,11 @@ app.get('/v1/stats/users', async (req, res) => {
         FROM (
           SELECT device_id, COUNT(DISTINCT session_id) as session_count
           FROM events
-          WHERE timestamp >= $1
+          WHERE timestamp >= $1 AND timestamp <= $2
           GROUP BY device_id
         ) user_sessions
         GROUP BY bucket
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Average session duration
       pool.query(`
@@ -841,7 +858,7 @@ app.get('/v1/stats/users', async (req, res) => {
         FROM (
           SELECT session_id, MAX(session_duration_seconds) as max_duration
           FROM events
-          WHERE timestamp >= $1 AND session_duration_seconds > 0
+          WHERE timestamp >= $1 AND timestamp <= $2 AND session_duration_seconds > 0
           GROUP BY session_id
         ) sessions
       `, [startDate.toISOString()])
@@ -862,9 +879,7 @@ app.get('/v1/stats/users', async (req, res) => {
 // GET /v1/stats/features - Feature usage analytics
 app.get('/v1/stats/features', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { startDate, endDate } = getDateRange(req.query);
 
     const [
       photosCaptured,
@@ -877,10 +892,10 @@ app.get('/v1/stats/features', async (req, res) => {
       pool.query(`
         SELECT DATE(timestamp) as date, COUNT(*) as count
         FROM events
-        WHERE name = 'photo_captured' AND timestamp >= $1
+        WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY DATE(timestamp)
         ORDER BY date DESC
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Photos deleted (manual vs auto)
       pool.query(`
@@ -888,9 +903,9 @@ app.get('/v1/stats/features', async (req, res) => {
           properties->>'was_manual' as was_manual,
           COUNT(*) as count
         FROM events
-        WHERE name = 'photo_deleted' AND timestamp >= $1
+        WHERE name = 'photo_deleted' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY properties->>'was_manual'
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Delete schedule distribution
       pool.query(`
@@ -898,9 +913,9 @@ app.get('/v1/stats/features', async (req, res) => {
           properties->>'delete_schedule' as schedule,
           COUNT(*) as count
         FROM events
-        WHERE name = 'photo_captured' AND timestamp >= $1
+        WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY properties->>'delete_schedule'
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Spam type distribution
       pool.query(`
@@ -908,9 +923,9 @@ app.get('/v1/stats/features', async (req, res) => {
           properties->>'spam_type' as spam_type,
           COUNT(*) as count
         FROM events
-        WHERE name = 'photo_captured' AND timestamp >= $1
+        WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY properties->>'spam_type'
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Feature toggles
       pool.query(`
@@ -919,9 +934,9 @@ app.get('/v1/stats/features', async (req, res) => {
           SUM(CASE WHEN (properties->>'enabled')::boolean THEN 1 ELSE 0 END) as enabled_count,
           SUM(CASE WHEN NOT (properties->>'enabled')::boolean THEN 1 ELSE 0 END) as disabled_count
         FROM events
-        WHERE name = 'feature_toggled' AND timestamp >= $1
+        WHERE name = 'feature_toggled' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY properties->>'feature'
-      `, [startDate.toISOString()])
+      `, [startDate.toISOString(), endDate.toISOString()])
     ]);
 
     res.json({
@@ -940,9 +955,7 @@ app.get('/v1/stats/features', async (req, res) => {
 // GET /v1/stats/funnel - Conversion funnel
 app.get('/v1/stats/funnel', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { startDate, endDate } = getDateRange(req.query);
 
     const [
       appOpens,
@@ -952,12 +965,12 @@ app.get('/v1/stats/funnel', async (req, res) => {
       purchaseStarted,
       purchaseCompleted
     ] = await Promise.all([
-      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'app_opened' AND timestamp >= $1`, [startDate.toISOString()]),
-      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'camera_opened' AND timestamp >= $1`, [startDate.toISOString()]),
-      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'photo_captured' AND timestamp >= $1`, [startDate.toISOString()]),
-      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'paywall_viewed' AND timestamp >= $1`, [startDate.toISOString()]),
-      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'purchase_started' AND timestamp >= $1`, [startDate.toISOString()]),
-      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'purchase_completed' AND timestamp >= $1`, [startDate.toISOString()])
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'app_opened' AND timestamp >= $1 AND timestamp <= $2`, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'camera_opened' AND timestamp >= $1 AND timestamp <= $2`, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2`, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'paywall_viewed' AND timestamp >= $1 AND timestamp <= $2`, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'purchase_started' AND timestamp >= $1 AND timestamp <= $2`, [startDate.toISOString(), endDate.toISOString()]),
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events WHERE name = 'purchase_completed' AND timestamp >= $1 AND timestamp <= $2`, [startDate.toISOString(), endDate.toISOString()])
     ]);
 
     const funnel = [
@@ -1032,9 +1045,7 @@ app.get('/v1/stats/realtime', async (req, res) => {
 // GET /v1/stats/retention - Retention cohort analysis
 app.get('/v1/stats/retention', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { startDate, endDate } = getDateRange(req.query);
 
     // Get cohort data: users who first appeared on each day and their return rates
     const cohortQuery = await pool.query(`
@@ -1043,7 +1054,7 @@ app.get('/v1/stats/retention', async (req, res) => {
           device_id,
           DATE(MIN(timestamp)) as cohort_date
         FROM events
-        WHERE timestamp >= $1
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY device_id
       ),
       user_activity AS (
@@ -1054,7 +1065,7 @@ app.get('/v1/stats/retention', async (req, res) => {
           DATE(e.timestamp) - ufs.cohort_date as days_since_install
         FROM events e
         JOIN user_first_seen ufs ON e.device_id = ufs.device_id
-        WHERE e.timestamp >= $1
+        WHERE e.timestamp >= $1 AND e.timestamp <= $2
       )
       SELECT
         cohort_date,
@@ -1066,7 +1077,7 @@ app.get('/v1/stats/retention', async (req, res) => {
       GROUP BY cohort_date
       ORDER BY cohort_date DESC
       LIMIT 14
-    `, [startDate.toISOString()]);
+    `, [startDate.toISOString(), endDate.toISOString()]);
 
     // Calculate overall retention rates
     const overallRetention = await pool.query(`
@@ -1075,7 +1086,7 @@ app.get('/v1/stats/retention', async (req, res) => {
           device_id,
           DATE(MIN(timestamp)) as cohort_date
         FROM events
-        WHERE timestamp >= $1
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY device_id
       ),
       retention_data AS (
@@ -1085,7 +1096,7 @@ app.get('/v1/stats/retention', async (req, res) => {
           MAX(DATE(e.timestamp) - ufs.cohort_date) as max_days_retained
         FROM user_first_seen ufs
         LEFT JOIN events e ON ufs.device_id = e.device_id
-        WHERE e.timestamp >= $1
+        WHERE e.timestamp >= $1 AND e.timestamp <= $2
         GROUP BY ufs.device_id, ufs.cohort_date
       )
       SELECT
@@ -1094,7 +1105,7 @@ app.get('/v1/stats/retention', async (req, res) => {
         COUNT(DISTINCT CASE WHEN max_days_retained >= 7 THEN device_id END) as d7_retained,
         COUNT(DISTINCT CASE WHEN max_days_retained >= 30 THEN device_id END) as d30_retained
       FROM retention_data
-    `, [startDate.toISOString()]);
+    `, [startDate.toISOString(), endDate.toISOString()]);
 
     const total = parseInt(overallRetention.rows[0].total_users) || 1;
     const d1 = parseInt(overallRetention.rows[0].d1_retained) || 0;
@@ -1273,16 +1284,35 @@ app.get('/v1/users', async (req, res) => {
   try {
     const {
       days = 90,
+      startDate: startDateParam,
+      endDate: endDateParam,
       limit = 50,
       offset = 0,
       search = '',
-      filter = 'all', // all, purchasers, active, churned
+      filter = 'all', // all, purchasers, active, churned, retained
       sort = 'last_active', // last_active, first_seen, events, purchases
-      order = 'desc'
+      order = 'desc',
+      // Drill-down filters
+      country,
+      tier,
+      device,
+      language,
+      os,
+      plan
     } = req.query;
 
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    // Use date range helper or fallback to days-based calculation
+    let startDate, endDate;
+    if (startDateParam && endDateParam) {
+      startDate = new Date(startDateParam);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(endDateParam);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      endDate = new Date();
+      startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(days));
+    }
 
     let filterClause = '';
     if (filter === 'purchasers') {
@@ -1294,11 +1324,60 @@ app.get('/v1/users', async (req, res) => {
       filterClause = `AND last_active >= NOW() - INTERVAL '7 days'`;
     } else if (filter === 'churned') {
       filterClause = `AND last_active < NOW() - INTERVAL '30 days'`;
+    } else if (filter === 'retained') {
+      // Users who came back after day 7
+      filterClause = `AND device_id IN (
+        SELECT device_id FROM events
+        WHERE timestamp >= MIN(timestamp) + INTERVAL '7 days'
+        GROUP BY device_id
+      )`;
+    }
+
+    // Drill-down filter clauses
+    if (country) {
+      filterClause += ` AND device_id IN (
+        SELECT DISTINCT device_id FROM events
+        WHERE country = '${country.replace(/'/g, "''")}'
+      )`;
+    }
+    if (tier) {
+      const tierFilter = tier.toLowerCase();
+      if (tierFilter === 'free') {
+        filterClause += ` AND device_id NOT IN (
+          SELECT DISTINCT device_id FROM events WHERE name = 'purchase_completed'
+        )`;
+      } else {
+        filterClause += ` AND device_id IN (
+          SELECT DISTINCT device_id FROM events
+          WHERE name = 'subscription_started' AND properties->>'tier' = '${tierFilter}'
+        )`;
+      }
+    }
+    if (device) {
+      filterClause += ` AND device_model ILIKE '%${device.replace(/'/g, "''")}%'`;
+    }
+    if (language) {
+      filterClause += ` AND locale ILIKE '${language.replace(/'/g, "''")}%'`;
+    }
+    if (os) {
+      filterClause += ` AND os_version ILIKE '%${os.replace(/'/g, "''")}%'`;
+    }
+    if (plan) {
+      // Plan is like "Pro Monthly", "Pro Yearly", etc.
+      const planParts = plan.toLowerCase().split(' ');
+      const planTier = planParts[0]; // pro or max
+      const planPeriod = planParts[1] === 'yearly' ? 'yearly' : 'monthly';
+      filterClause += ` AND device_id IN (
+        SELECT DISTINCT device_id FROM events
+        WHERE name = 'subscription_started'
+          AND properties->>'tier' = '${planTier}'
+          AND properties->>'billing_period' = '${planPeriod}'
+      )`;
     }
 
     let searchClause = '';
     if (search) {
-      searchClause = `AND (device_id ILIKE $4 OR user_id ILIKE $4)`;
+      searchClause = `AND (device_id ILIKE $5 OR user_id ILIKE $5)`;
     }
 
     const orderColumn = {
@@ -1310,7 +1389,7 @@ app.get('/v1/users', async (req, res) => {
 
     const orderDir = order === 'asc' ? 'ASC' : 'DESC';
 
-    const params = [startDate.toISOString(), parseInt(limit), parseInt(offset)];
+    const params = [startDate.toISOString(), endDate.toISOString(), parseInt(limit), parseInt(offset)];
     if (search) params.push(`%${search}%`);
 
     const usersQuery = await pool.query(`
@@ -1329,7 +1408,7 @@ app.get('/v1/users', async (req, res) => {
           MAX(locale) as locale,
           MAX(timezone) as timezone
         FROM events
-        WHERE timestamp >= $1
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY device_id, user_id
       ),
       purchase_stats AS (
@@ -1338,7 +1417,7 @@ app.get('/v1/users', async (req, res) => {
           COUNT(*) as purchase_count,
           SUM((properties->>'revenue')::numeric) as total_revenue
         FROM events
-        WHERE name = 'purchase_completed' AND timestamp >= $1
+        WHERE name = 'purchase_completed' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY device_id
       ),
       camera_stats AS (
@@ -1346,7 +1425,7 @@ app.get('/v1/users', async (req, res) => {
           device_id,
           COUNT(*) as photos_captured
         FROM events
-        WHERE name = 'photo_captured' AND timestamp >= $1
+        WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY device_id
       )
       SELECT
@@ -1365,25 +1444,28 @@ app.get('/v1/users', async (req, res) => {
       LEFT JOIN camera_stats cs ON us.device_id = cs.device_id
       WHERE 1=1 ${filterClause} ${searchClause}
       ORDER BY ${orderColumn} ${orderDir}
-      LIMIT $2 OFFSET $3
+      LIMIT $3 OFFSET $4
     `, params);
 
     // Get total count for pagination
-    const countParams = [startDate.toISOString()];
+    const countParams = [startDate.toISOString(), endDate.toISOString()];
     if (search) countParams.push(`%${search}%`);
 
     const countQuery = await pool.query(`
       WITH user_stats AS (
         SELECT
           device_id,
-          MAX(timestamp) as last_active
+          MAX(timestamp) as last_active,
+          MAX(device_model) as device_model,
+          MAX(os_version) as os_version,
+          MAX(locale) as locale
         FROM events
-        WHERE timestamp >= $1
+        WHERE timestamp >= $1 AND timestamp <= $2
         GROUP BY device_id
       )
       SELECT COUNT(*) as total
       FROM user_stats
-      WHERE 1=1 ${filterClause} ${search ? 'AND device_id ILIKE $2' : ''}
+      WHERE 1=1 ${filterClause} ${search ? 'AND device_id ILIKE $3' : ''}
     `, countParams);
 
     res.json({
@@ -1588,10 +1670,8 @@ app.get('/v1/users/:device_id', async (req, res) => {
 app.get('/v1/users/by-event/:event_name', async (req, res) => {
   try {
     const { event_name } = req.params;
-    const { days = 30, limit = 100, offset = 0 } = req.query;
-
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { limit = 100, offset = 0 } = req.query;
+    const { startDate, endDate } = getDateRange(req.query);
 
     const usersQuery = await pool.query(`
       WITH event_users AS (
@@ -1602,7 +1682,7 @@ app.get('/v1/users/by-event/:event_name', async (req, res) => {
           MAX(timestamp) as last_occurrence,
           MAX(properties) as last_properties
         FROM events
-        WHERE name = $1 AND timestamp >= $2
+        WHERE name = $1 AND timestamp >= $2 AND timestamp <= $3
         GROUP BY device_id
       ),
       user_stats AS (
@@ -1622,14 +1702,14 @@ app.get('/v1/users/by-event/:event_name', async (req, res) => {
       FROM event_users eu
       JOIN user_stats us ON eu.device_id = us.device_id
       ORDER BY eu.last_occurrence DESC
-      LIMIT $3 OFFSET $4
-    `, [event_name, startDate.toISOString(), parseInt(limit), parseInt(offset)]);
+      LIMIT $4 OFFSET $5
+    `, [event_name, startDate.toISOString(), endDate.toISOString(), parseInt(limit), parseInt(offset)]);
 
     const countQuery = await pool.query(`
       SELECT COUNT(DISTINCT device_id) as total
       FROM events
-      WHERE name = $1 AND timestamp >= $2
-    `, [event_name, startDate.toISOString()]);
+      WHERE name = $1 AND timestamp >= $2 AND timestamp <= $3
+    `, [event_name, startDate.toISOString(), endDate.toISOString()]);
 
     res.json({
       event_name,
@@ -1655,12 +1735,66 @@ app.get('/v1/users/by-event/:event_name', async (req, res) => {
   }
 });
 
+// GET /v1/users/funnel-dropoff - Get users who completed one step but not the next
+app.get('/v1/users/funnel-dropoff', async (req, res) => {
+  try {
+    const { completed, notCompleted, limit = 100 } = req.query;
+    const { startDate, endDate } = getDateRange(req.query);
+
+    if (!completed || !notCompleted) {
+      return res.status(400).json({ error: 'completed and notCompleted params required' });
+    }
+
+    const usersQuery = await pool.query(`
+      WITH completed_users AS (
+        SELECT DISTINCT device_id
+        FROM events
+        WHERE name = $1 AND timestamp >= $3 AND timestamp <= $4
+      ),
+      not_completed_users AS (
+        SELECT DISTINCT device_id
+        FROM events
+        WHERE name = $2 AND timestamp >= $3 AND timestamp <= $4
+      ),
+      dropoff_users AS (
+        SELECT cu.device_id
+        FROM completed_users cu
+        LEFT JOIN not_completed_users ncu ON cu.device_id = ncu.device_id
+        WHERE ncu.device_id IS NULL
+      )
+      SELECT
+        du.device_id,
+        MIN(e.timestamp) as first_seen,
+        MAX(e.timestamp) as last_active,
+        COUNT(*) as total_events
+      FROM dropoff_users du
+      JOIN events e ON du.device_id = e.device_id
+      GROUP BY du.device_id
+      ORDER BY last_active DESC
+      LIMIT $5
+    `, [completed, notCompleted, startDate.toISOString(), endDate.toISOString(), parseInt(limit)]);
+
+    res.json({
+      completed_step: completed,
+      not_completed_step: notCompleted,
+      users: usersQuery.rows.map(u => ({
+        device_id: u.device_id,
+        first_seen: u.first_seen,
+        last_active: u.last_active,
+        total_events: parseInt(u.total_events),
+        status: 'dropoff'
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching funnel dropoff users:', error);
+    res.status(500).json({ error: 'Failed to fetch dropoff users' });
+  }
+});
+
 // GET /v1/stats/acquisition - Attribution and acquisition analytics
 app.get('/v1/stats/acquisition', async (req, res) => {
   try {
-    const { days = 30 } = req.query;
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(days));
+    const { startDate, endDate } = getDateRange(req.query);
 
     const [
       installsByDay,
@@ -1681,10 +1815,10 @@ app.get('/v1/stats/acquisition', async (req, res) => {
         )
         SELECT DATE(first_seen) as date, COUNT(*) as installs
         FROM first_events
-        WHERE first_seen >= $1
+        WHERE first_seen >= $1 AND first_seen <= $2
         GROUP BY DATE(first_seen)
         ORDER BY date DESC
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Installs by attribution source
       pool.query(`
@@ -1699,10 +1833,10 @@ app.get('/v1/stats/acquisition', async (req, res) => {
         )
         SELECT COALESCE(source, 'organic') as source, COUNT(*) as installs
         FROM first_events
-        WHERE first_seen >= $1
+        WHERE first_seen >= $1 AND first_seen <= $2
         GROUP BY source
         ORDER BY installs DESC
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Organic vs Paid
       pool.query(`
@@ -1719,18 +1853,18 @@ app.get('/v1/stats/acquisition', async (req, res) => {
           COUNT(CASE WHEN is_organic = 'true' OR is_organic IS NULL THEN 1 END) as organic,
           COUNT(CASE WHEN is_organic = 'false' THEN 1 END) as paid
         FROM first_events
-        WHERE first_seen >= $1
-      `, [startDate.toISOString()]),
+        WHERE first_seen >= $1 AND first_seen <= $2
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Device model breakdown
       pool.query(`
         SELECT device_model, COUNT(DISTINCT device_id) as users
         FROM events
-        WHERE timestamp >= $1 AND device_model IS NOT NULL
+        WHERE timestamp >= $1 AND timestamp <= $2 AND device_model IS NOT NULL
         GROUP BY device_model
         ORDER BY users DESC
         LIMIT 10
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Geographic breakdown by locale/timezone
       pool.query(`
@@ -1738,11 +1872,11 @@ app.get('/v1/stats/acquisition', async (req, res) => {
           COALESCE(NULLIF(SPLIT_PART(locale, '_', 2), ''), locale, 'Unknown') as country,
           COUNT(DISTINCT device_id) as users
         FROM events
-        WHERE timestamp >= $1 AND locale IS NOT NULL
+        WHERE timestamp >= $1 AND timestamp <= $2 AND locale IS NOT NULL
         GROUP BY country
         ORDER BY users DESC
         LIMIT 10
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Timezone distribution
       pool.query(`
@@ -1750,11 +1884,11 @@ app.get('/v1/stats/acquisition', async (req, res) => {
           timezone,
           COUNT(DISTINCT device_id) as users
         FROM events
-        WHERE timestamp >= $1 AND timezone IS NOT NULL
+        WHERE timestamp >= $1 AND timestamp <= $2 AND timezone IS NOT NULL
         GROUP BY timezone
         ORDER BY users DESC
         LIMIT 15
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // Language breakdown
       pool.query(`
@@ -1762,11 +1896,11 @@ app.get('/v1/stats/acquisition', async (req, res) => {
           COALESCE(SPLIT_PART(locale, '_', 1), 'unknown') as language,
           COUNT(DISTINCT device_id) as users
         FROM events
-        WHERE timestamp >= $1 AND locale IS NOT NULL
+        WHERE timestamp >= $1 AND timestamp <= $2 AND locale IS NOT NULL
         GROUP BY language
         ORDER BY users DESC
         LIMIT 10
-      `, [startDate.toISOString()]),
+      `, [startDate.toISOString(), endDate.toISOString()]),
 
       // OS version breakdown
       pool.query(`
@@ -1774,11 +1908,11 @@ app.get('/v1/stats/acquisition', async (req, res) => {
           os_version,
           COUNT(DISTINCT device_id) as users
         FROM events
-        WHERE timestamp >= $1 AND os_version IS NOT NULL
+        WHERE timestamp >= $1 AND timestamp <= $2 AND os_version IS NOT NULL
         GROUP BY os_version
         ORDER BY users DESC
         LIMIT 10
-      `, [startDate.toISOString()])
+      `, [startDate.toISOString(), endDate.toISOString()])
     ]);
 
     res.json({
