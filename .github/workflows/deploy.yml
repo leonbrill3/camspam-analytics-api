@@ -1,0 +1,48 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render Deploy
+        run: |
+          # Use deploy hook URL (simpler, no auth needed)
+          if [ -n "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+            echo "Using deploy hook URL..."
+            response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.RENDER_DEPLOY_HOOK }}")
+            if [ "$response" = "200" ] || [ "$response" = "201" ]; then
+              echo "✅ Deploy triggered successfully! (HTTP $response)"
+              exit 0
+            else
+              echo "❌ Deploy hook failed with HTTP $response"
+              exit 1
+            fi
+          # Fallback to API key if deploy hook not set
+          elif [ -n "${{ secrets.RENDER_API_KEY }}" ]; then
+            echo "Using Render API..."
+            response=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://api.render.com/v1/services/srv-d7b9qnea2pns73bei8m0/deploys" \
+              -H "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+              -H "Content-Type: application/json" \
+              -d '{}')
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+              echo "✅ Deploy triggered successfully!"
+              echo "$body"
+              exit 0
+            else
+              echo "❌ API request failed with HTTP $http_code"
+              echo "$body"
+              exit 1
+            fi
+          else
+            echo "❌ No deployment credentials configured!"
+            echo "Add either RENDER_DEPLOY_HOOK or RENDER_API_KEY as a GitHub secret."
+            exit 1
+          fi
