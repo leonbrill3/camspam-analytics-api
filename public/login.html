@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - CamSpam Analytics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            --bg-card: rgba(255,255,255,0.05);
+            --border-color: rgba(255,255,255,0.1);
+            --text-primary: #fff;
+            --text-secondary: rgba(255,255,255,0.7);
+            --text-muted: rgba(255,255,255,0.5);
+            --accent-blue: #60a5fa;
+            --accent-purple: #a855f7;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, var(--bg-tertiary) 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .login-logo-text {
+            font-size: 24px;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .login-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--gradient-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--accent-red);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .success-message {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--accent-green);
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .verification-info {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .verification-info strong {
+            color: var(--text-primary);
+        }
+
+        .code-inputs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+
+        .code-input {
+            width: 50px;
+            height: 60px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .code-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            background: rgba(255,255,255,0.08);
+        }
+
+        .back-link {
+            display: block;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 20px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .back-link:hover {
+            color: var(--text-primary);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <div class="login-logo-icon">📸</div>
+                <div class="login-logo-text">CamSpam Analytics</div>
+                <div class="login-subtitle">Admin Dashboard</div>
+            </div>
+
+            <!-- Step 1: Login Form -->
+            <div id="loginStep">
+                <div class="error-message" id="loginError"></div>
+
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" class="form-input" id="username" placeholder="Enter username" autocomplete="username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" class="form-input" id="password" placeholder="Enter password" autocomplete="current-password" required>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="loginBtn">
+                        Sign In
+                    </button>
+                </form>
+            </div>
+
+            <!-- Step 2: 2FA Verification -->
+            <div id="verifyStep" class="hidden">
+                <div class="success-message show">
+                    Verification code sent!
+                </div>
+
+                <div class="verification-info">
+                    Enter the 6-digit code sent to<br>
+                    <strong>***-***-<span id="phoneLast4"></span></strong>
+                </div>
+
+                <div class="error-message" id="verifyError"></div>
+
+                <form id="verifyForm">
+                    <div class="code-inputs">
+                        <input type="text" class="code-input" maxlength="1" data-index="0" inputmode="numeric">
+                        <input type="text" class="code-input" maxlength="1" data-index="1" inputmode="numeric">
+                        <input type="text" class="code-input" maxlength="1" data-index="2" inputmode="numeric">
+                        <input type="text" class="code-input" maxlength="1" data-index="3" inputmode="numeric">
+                        <input type="text" class="code-input" maxlength="1" data-index="4" inputmode="numeric">
+                        <input type="text" class="code-input" maxlength="1" data-index="5" inputmode="numeric">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="verifyBtn">
+                        Verify Code
+                    </button>
+                </form>
+
+                <a class="back-link" id="backToLogin">← Back to login</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let verificationId = null;
+
+        // Check if already logged in
+        const sessionToken = localStorage.getItem('sessionToken');
+        if (sessionToken) {
+            fetch('/auth/session', {
+                headers: { 'X-Session-Token': sessionToken }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.authenticated) {
+                    window.location.href = '/';
+                }
+            });
+        }
+
+        // Login form
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const errorEl = document.getElementById('loginError');
+
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="loading-spinner"></span>Signing in...';
+            errorEl.classList.remove('show');
+
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Login failed');
+                }
+
+                verificationId = data.verificationId;
+                document.getElementById('phoneLast4').textContent = data.phoneLast4;
+                document.getElementById('loginStep').classList.add('hidden');
+                document.getElementById('verifyStep').classList.remove('hidden');
+                document.querySelector('.code-input').focus();
+
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.classList.add('show');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Sign In';
+            }
+        });
+
+        // Code inputs auto-advance
+        document.querySelectorAll('.code-input').forEach((input, index, inputs) => {
+            input.addEventListener('input', (e) => {
+                const value = e.target.value;
+                if (value && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+                // Auto-submit when all filled
+                if (index === inputs.length - 1 && value) {
+                    const code = Array.from(inputs).map(i => i.value).join('');
+                    if (code.length === 6) {
+                        document.getElementById('verifyForm').dispatchEvent(new Event('submit'));
+                    }
+                }
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && index > 0) {
+                    inputs[index - 1].focus();
+                }
+            });
+
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+                paste.split('').forEach((char, i) => {
+                    if (inputs[i]) inputs[i].value = char;
+                });
+                if (paste.length === 6) {
+                    document.getElementById('verifyForm').dispatchEvent(new Event('submit'));
+                }
+            });
+        });
+
+        // Verify form
+        document.getElementById('verifyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const code = Array.from(document.querySelectorAll('.code-input')).map(i => i.value).join('');
+            const verifyBtn = document.getElementById('verifyBtn');
+            const errorEl = document.getElementById('verifyError');
+
+            if (code.length !== 6) {
+                errorEl.textContent = 'Please enter the 6-digit code';
+                errorEl.classList.add('show');
+                return;
+            }
+
+            verifyBtn.disabled = true;
+            verifyBtn.innerHTML = '<span class="loading-spinner"></span>Verifying...';
+            errorEl.classList.remove('show');
+
+            try {
+                const response = await fetch('/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ verificationId, code })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Verification failed');
+                }
+
+                localStorage.setItem('sessionToken', data.sessionToken);
+                localStorage.setItem('user', JSON.stringify(data.user));
+                window.location.href = '/';
+
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.classList.add('show');
+                document.querySelectorAll('.code-input').forEach(i => i.value = '');
+                document.querySelector('.code-input').focus();
+            } finally {
+                verifyBtn.disabled = false;
+                verifyBtn.textContent = 'Verify Code';
+            }
+        });
+
+        // Back to login
+        document.getElementById('backToLogin').addEventListener('click', () => {
+            document.getElementById('verifyStep').classList.add('hidden');
+            document.getElementById('loginStep').classList.remove('hidden');
+            document.querySelectorAll('.code-input').forEach(i => i.value = '');
+            verificationId = null;
+        });
+    </script>
+</body>
+</html>

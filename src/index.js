@@ -7,6 +7,7 @@ const { Pool } = require('pg');
 const path = require('path');
 const dns = require('dns');
 const twilio = require('twilio');
+const crypto = require('crypto');
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -61,6 +62,174 @@ const limiter = rateLimit({
   message: { error: 'Too many requests' }
 });
 app.use('/v1/events', limiter);
+
+// ============================================
+// AUTHENTICATION SYSTEM WITH 2FA
+// ============================================
+
+// In-memory session store (in production, use Redis)
+const sessions = new Map();
+const pendingVerifications = new Map();
+
+// Admin users (hashed passwords)
+const adminUsers = {
+  'leonbrill': {
+    passwordHash: crypto.createHash('sha256').update('cKorsow12!s').digest('hex'),
+    phone: '+19546631398',
+    name: 'Leon Brill'
+  }
+};
+
+// Generate session token
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  const sessionToken = req.headers['x-session-token'] || req.query.sessionToken;
+
+  if (!sessionToken || !sessions.has(sessionToken)) {
+    return res.status(401).json({ error: 'Authentication required', needsLogin: true });
+  }
+
+  const session = sessions.get(sessionToken);
+  if (Date.now() > session.expiresAt) {
+    sessions.delete(sessionToken);
+    return res.status(401).json({ error: 'Session expired', needsLogin: true });
+  }
+
+  req.user = session.user;
+  next();
+}
+
+// Login - Step 1: Verify username/password
+app.post('/auth/login', (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password required' });
+  }
+
+  const user = adminUsers[username.toLowerCase()];
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+  if (passwordHash !== user.passwordHash) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  // Generate verification token and send SMS
+  const verificationId = crypto.randomBytes(16).toString('hex');
+  pendingVerifications.set(verificationId, {
+    username: username.toLowerCase(),
+    expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+    attempts: 0
+  });
+
+  // Send SMS via Twilio Verify
+  if (twilioClient && TWILIO_VERIFY_SERVICE_SID) {
+    twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID)
+      .verifications.create({ to: user.phone, channel: 'sms' })
+      .then(() => {
+        res.json({
+          success: true,
+          verificationId,
+          message: 'Verification code sent to your phone',
+          phoneLast4: user.phone.slice(-4)
+        });
+      })
+      .catch(err => {
+        console.error('Twilio error:', err);
+        res.status(500).json({ error: 'Failed to send verification code' });
+      });
+  } else {
+    res.status(500).json({ error: 'SMS service not configured' });
+  }
+});
+
+// Login - Step 2: Verify SMS code
+app.post('/auth/verify', async (req, res) => {
+  const { verificationId, code } = req.body;
+
+  if (!verificationId || !code) {
+    return res.status(400).json({ error: 'Verification ID and code required' });
+  }
+
+  const pending = pendingVerifications.get(verificationId);
+  if (!pending) {
+    return res.status(401).json({ error: 'Invalid or expired verification' });
+  }
+
+  if (Date.now() > pending.expiresAt) {
+    pendingVerifications.delete(verificationId);
+    return res.status(401).json({ error: 'Verification expired' });
+  }
+
+  pending.attempts++;
+  if (pending.attempts > 5) {
+    pendingVerifications.delete(verificationId);
+    return res.status(401).json({ error: 'Too many attempts' });
+  }
+
+  const user = adminUsers[pending.username];
+
+  // Verify code with Twilio
+  try {
+    const verification = await twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID)
+      .verificationChecks.create({ to: user.phone, code });
+
+    if (verification.status !== 'approved') {
+      return res.status(401).json({ error: 'Invalid code' });
+    }
+
+    // Success - create session
+    pendingVerifications.delete(verificationId);
+    const sessionToken = generateSessionToken();
+    sessions.set(sessionToken, {
+      user: { username: pending.username, name: user.name },
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    });
+
+    res.json({
+      success: true,
+      sessionToken,
+      user: { username: pending.username, name: user.name }
+    });
+  } catch (err) {
+    console.error('Verification error:', err);
+    res.status(401).json({ error: 'Invalid code' });
+  }
+});
+
+// Logout
+app.post('/auth/logout', (req, res) => {
+  const sessionToken = req.headers['x-session-token'];
+  if (sessionToken) {
+    sessions.delete(sessionToken);
+  }
+  res.json({ success: true });
+});
+
+// Check session
+app.get('/auth/session', (req, res) => {
+  const sessionToken = req.headers['x-session-token'] || req.query.sessionToken;
+
+  if (!sessionToken || !sessions.has(sessionToken)) {
+    return res.json({ authenticated: false });
+  }
+
+  const session = sessions.get(sessionToken);
+  if (Date.now() > session.expiresAt) {
+    sessions.delete(sessionToken);
+    return res.json({ authenticated: false });
+  }
+
+  res.json({ authenticated: true, user: session.user });
+});
 
 // Helper function to parse date range from query params
 function getDateRange(query) {

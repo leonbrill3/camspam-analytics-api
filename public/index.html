@@ -4,6 +4,30 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CamSpam Analytics Dashboard</title>
+    <script>
+        // Auth check - redirect to login if not authenticated
+        (function() {
+            const sessionToken = localStorage.getItem('sessionToken');
+            if (!sessionToken) {
+                window.location.href = '/login.html';
+            } else {
+                fetch('/auth/session', {
+                    headers: { 'X-Session-Token': sessionToken }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.authenticated) {
+                        localStorage.removeItem('sessionToken');
+                        localStorage.removeItem('user');
+                        window.location.href = '/login.html';
+                    }
+                })
+                .catch(() => {
+                    window.location.href = '/login.html';
+                });
+            }
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1126,6 +1150,17 @@
                     <div class="nav-item" data-page="integrations">
                         <span class="nav-item-icon">🔗</span>
                         <span>Status</span>
+                    </div>
+                </div>
+
+                <div class="nav-section" style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color);">
+                    <div class="nav-item" id="userInfo" style="color: var(--text-muted); font-size: 12px;">
+                        <span class="nav-item-icon">👤</span>
+                        <span id="userName">User</span>
+                    </div>
+                    <div class="nav-item" id="logoutBtn" style="color: var(--accent-red);">
+                        <span class="nav-item-icon">🚪</span>
+                        <span>Logout</span>
                     </div>
                 </div>
             </nav>
@@ -3974,6 +4009,26 @@
             }
         `;
         document.head.appendChild(style);
+
+        // Set user name from localStorage
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.name) {
+            document.getElementById('userName').textContent = user.name;
+        }
+
+        // Logout handler
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            const sessionToken = localStorage.getItem('sessionToken');
+            if (sessionToken) {
+                await fetch('/auth/logout', {
+                    method: 'POST',
+                    headers: { 'X-Session-Token': sessionToken }
+                });
+            }
+            localStorage.removeItem('sessionToken');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        });
     </script>
 </body>
 </html>
