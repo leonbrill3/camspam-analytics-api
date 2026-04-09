@@ -2564,16 +2564,18 @@ app.get('/v1/sentry/overview', async (req, res) => {
     }
 
     const { days = 14 } = req.query;
+    // Sentry only accepts 24h or 14d for statsPeriod
+    const statsPeriod = Number(days) <= 1 ? '24h' : '14d';
 
     const [issuesResponse, statsResponse] = await Promise.all([
       // Get recent issues
       fetch(
-        `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=is:unresolved&statsPeriod=${days}d&limit=25`,
+        `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=is:unresolved&statsPeriod=${statsPeriod}&limit=25`,
         { headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` } }
       ),
       // Get project stats
       fetch(
-        `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/stats/?stat=received&resolution=1d&statsPeriod=${days}d`,
+        `https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/stats/?stat=received&resolution=1d&statsPeriod=${statsPeriod}`,
         { headers: { 'Authorization': `Bearer ${SENTRY_AUTH_TOKEN}` } }
       )
     ]);
