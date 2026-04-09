@@ -46,3 +46,4 @@ jobs:
             echo "Add either RENDER_DEPLOY_HOOK or RENDER_API_KEY as a GitHub secret."
             exit 1
           fi
+
