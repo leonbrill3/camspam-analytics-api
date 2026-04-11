@@ -2274,11 +2274,27 @@ app.get('/v1/amplitude/user-activity', async (req, res) => {
       sessions.json()
     ]);
 
+    // Transform Amplitude's nested format to simple [{date, count}] format
+    const transformUserData = (data) => {
+      if (!data?.data?.xValues || !data?.data?.series?.[0]) return [];
+      return data.data.xValues.map((date, i) => ({
+        date,
+        count: data.data.series[0][i] || 0
+      }));
+    };
+
+    const transformSessionData = (data) => {
+      if (!data?.data?.xValues || !data?.data?.series?.[0]) return [];
+      const avgValue = data.data.seriesCollapsed?.[0]?.[0]?.value ||
+                       data.data.series[0].reduce((a, b) => a + b, 0) / data.data.series[0].length;
+      return [{ value: avgValue }];
+    };
+
     res.json({
       configured: true,
-      active_users: activeData.data || [],
-      new_users: newData.data || [],
-      avg_session_length: sessionData.data || [],
+      active_users: transformUserData(activeData),
+      new_users: transformUserData(newData),
+      avg_session_length: transformSessionData(sessionData),
       date_range: { start: startDate, end: endDate }
     });
   } catch (error) {
