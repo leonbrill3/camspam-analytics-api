@@ -2016,7 +2016,7 @@
                         <div class="stat-value" id="ampDAU">-</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">🆕 New Users</div>
+                        <div class="stat-label">🆕 New Users Today</div>
                         <div class="stat-value" id="ampNewUsers">-</div>
                     </div>
                     <div class="stat-card">
@@ -3658,11 +3658,11 @@
                 // Update stats using pre-calculated summary metrics
                 const summary = data.summary || {};
 
-                // DAU = today's active users (or latest day with data)
-                document.getElementById('ampDAU').textContent = formatNumber(summary.dau || summary.avg_dau || 0);
+                // DAU = today's active users (show actual value, not fallback to average)
+                document.getElementById('ampDAU').textContent = formatNumber(summary.dau ?? 0);
 
-                // New users = total new users in the period
-                document.getElementById('ampNewUsers').textContent = formatNumber(summary.total_new_users || 0);
+                // New users today (consistent with DAU)
+                document.getElementById('ampNewUsers').textContent = formatNumber(summary.new_users_today || 0);
 
                 // Get events data
                 const eventsRes = await fetch(`${API_BASE}/v1/amplitude/charts?${getDateParams()}`);
