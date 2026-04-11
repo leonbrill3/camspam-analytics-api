@@ -170,19 +170,7 @@ app.post('/auth/login', (req, res) => {
       res.status(500).json({ error: 'Failed to send verification code' });
     });
   } else {
-    // SMS not configured - create session directly (temporary bypass)
-    console.log('SMS not configured, bypassing 2FA for:', username);
-    const sessionToken = generateSessionToken();
-    sessions.set(sessionToken, {
-      user: { username: username.toLowerCase(), name: user.name },
-      expiresAt: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-    });
-    res.json({
-      success: true,
-      sessionToken,
-      user: { username: username.toLowerCase(), name: user.name },
-      message: 'Logged in (2FA bypassed - SMS not configured)'
-    });
+    res.status(500).json({ error: 'SMS service not configured' });
   }
 });
 
