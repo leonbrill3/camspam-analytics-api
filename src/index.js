@@ -19,7 +19,7 @@ const AMPLITUDE_SECRET_KEY = process.env.AMPLITUDE_SECRET_KEY;
 
 // AppsFlyer API credentials
 const APPSFLYER_API_TOKEN = process.env.APPSFLYER_API_TOKEN;
-const APPSFLYER_APP_ID = process.env.APPSFLYER_APP_ID || 'id6740044498'; // CamSpam App ID
+const APPSFLYER_APP_ID = process.env.APPSFLYER_APP_ID || 'id6761743132'; // CamSpam App ID
 
 // Sentry API credentials
 const SENTRY_AUTH_TOKEN = process.env.SENTRY_AUTH_TOKEN;
@@ -2276,25 +2276,54 @@ app.get('/v1/amplitude/user-activity', async (req, res) => {
 
     // Transform Amplitude's nested format to simple [{date, count}] format
     const transformUserData = (data) => {
-      if (!data?.data?.xValues || !data?.data?.series?.[0]) return [];
-      return data.data.xValues.map((date, i) => ({
+      if (!data?.data?.xValues || !data?.data?.series?.[0]) return { daily: [], today: 0, total: 0, average: 0 };
+      const daily = data.data.xValues.map((date, i) => ({
         date,
         count: data.data.series[0][i] || 0
       }));
+      const series = data.data.series[0];
+      const nonZeroDays = series.filter(v => v > 0);
+      return {
+        daily,
+        today: series[series.length - 1] || 0,  // Latest day's value
+        total: series.reduce((a, b) => a + b, 0),  // Sum (for reference)
+        average: nonZeroDays.length > 0 ? Math.round(nonZeroDays.reduce((a, b) => a + b, 0) / nonZeroDays.length) : 0
+      };
     };
 
     const transformSessionData = (data) => {
-      if (!data?.data?.xValues || !data?.data?.series?.[0]) return [];
-      const avgValue = data.data.seriesCollapsed?.[0]?.[0]?.value ||
-                       data.data.series[0].reduce((a, b) => a + b, 0) / data.data.series[0].length;
-      return [{ value: avgValue }];
+      if (!data?.data?.xValues || !data?.data?.series?.[0]) return { daily: [], average: 0 };
+      const daily = data.data.xValues.map((date, i) => ({
+        date,
+        seconds: data.data.series[0][i] || 0
+      }));
+      // Use Amplitude's pre-calculated average from seriesCollapsed
+      const avgSeconds = data.data.seriesCollapsed?.[0]?.[0]?.value || 0;
+      return {
+        daily,
+        average: avgSeconds,
+        average_formatted: avgSeconds > 0 ? `${Math.floor(avgSeconds / 60)}m ${Math.round(avgSeconds % 60)}s` : '0s'
+      };
     };
+
+    const activeMetrics = transformUserData(activeData);
+    const newMetrics = transformUserData(newData);
+    const sessionMetrics = transformSessionData(sessionData);
 
     res.json({
       configured: true,
-      active_users: transformUserData(activeData),
-      new_users: transformUserData(newData),
-      avg_session_length: transformSessionData(sessionData),
+      // Summary metrics for dashboard cards
+      summary: {
+        dau: activeMetrics.today,           // Today's DAU (or latest day)
+        avg_dau: activeMetrics.average,     // Average DAU over period
+        new_users_today: newMetrics.today,  // Today's new users
+        total_new_users: newMetrics.total,  // Total new users in period
+        avg_session: sessionMetrics.average_formatted
+      },
+      // Daily data for charts
+      active_users: activeMetrics.daily,
+      new_users: newMetrics.daily,
+      avg_session_length: sessionMetrics.daily,
       date_range: { start: startDate, end: endDate }
     });
   } catch (error) {

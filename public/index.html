@@ -3655,12 +3655,14 @@
                 document.getElementById('amplitudeStatus').style.background = 'var(--accent-green)';
                 document.getElementById('amplitudeSetup').style.display = 'none';
 
-                // Update stats
-                const activeTotal = data.active_users?.reduce((sum, d) => sum + (d.count || 0), 0) || 0;
-                const newTotal = data.new_users?.reduce((sum, d) => sum + (d.count || 0), 0) || 0;
+                // Update stats using pre-calculated summary metrics
+                const summary = data.summary || {};
 
-                document.getElementById('ampDAU').textContent = formatNumber(activeTotal);
-                document.getElementById('ampNewUsers').textContent = formatNumber(newTotal);
+                // DAU = today's active users (or latest day with data)
+                document.getElementById('ampDAU').textContent = formatNumber(summary.dau || summary.avg_dau || 0);
+
+                // New users = total new users in the period
+                document.getElementById('ampNewUsers').textContent = formatNumber(summary.total_new_users || 0);
 
                 // Get events data
                 const eventsRes = await fetch(`${API_BASE}/v1/amplitude/charts?${getDateParams()}`);
@@ -3669,9 +3671,8 @@
                 const totalEvents = eventsData.event_counts?.reduce((sum, d) => sum + (d.count || 0), 0) || 0;
                 document.getElementById('ampEvents').textContent = formatNumber(totalEvents);
 
-                // Avg session
-                const avgSession = data.avg_session_length?.[0]?.value || 0;
-                document.getElementById('ampSession').textContent = avgSession > 0 ? `${Math.round(avgSession / 60)}m` : '-';
+                // Avg session - use pre-formatted value from API
+                document.getElementById('ampSession').textContent = summary.avg_session || '-';
 
                 // Update chart
                 updateAmplitudeChart(data);
