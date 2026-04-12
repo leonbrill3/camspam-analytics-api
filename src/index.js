@@ -8,6 +8,8 @@ const path = require('path');
 const dns = require('dns');
 const twilio = require('twilio');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const { GoogleAuth } = require('google-auth-library');
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -25,6 +27,17 @@ const APPSFLYER_APP_ID = process.env.APPSFLYER_APP_ID || 'id6761743132'; // CamS
 const SENTRY_AUTH_TOKEN = process.env.SENTRY_AUTH_TOKEN;
 const SENTRY_ORG = process.env.SENTRY_ORG || 'camspam';
 const SENTRY_PROJECT = process.env.SENTRY_PROJECT || 'camspam-ios';
+
+// App Store Connect API credentials
+const ASC_ISSUER_ID = process.env.ASC_ISSUER_ID;
+const ASC_KEY_ID = process.env.ASC_KEY_ID;
+const ASC_PRIVATE_KEY = process.env.ASC_PRIVATE_KEY; // Base64 encoded .p8 file contents
+const ASC_APP_ID = process.env.ASC_APP_ID || '6761743132'; // CamSpam App ID
+
+// Google Search Console API credentials
+const GSC_CLIENT_EMAIL = process.env.GSC_CLIENT_EMAIL;
+const GSC_PRIVATE_KEY = process.env.GSC_PRIVATE_KEY; // Base64 encoded private key
+const GSC_SITE_URL = process.env.GSC_SITE_URL || 'https://camspam.com';
 
 // Force IPv4 to avoid ECONNREFUSED on some cloud platforms
 dns.setDefaultResultOrder('ipv4first');
@@ -2823,6 +2836,516 @@ app.get('/v1/sentry/crashes', async (req, res) => {
 });
 
 // ============================================
+// APP STORE CONNECT API INTEGRATION
+// ============================================
+
+// Helper function to generate App Store Connect JWT
+function generateASCToken() {
+  if (!ASC_ISSUER_ID || !ASC_KEY_ID || !ASC_PRIVATE_KEY) {
+    return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: ASC_ISSUER_ID,
+    iat: now,
+    exp: now + 20 * 60, // 20 minutes
+    aud: 'appstoreconnect-v1'
+  };
+
+  // Decode base64 private key
+  const privateKey = Buffer.from(ASC_PRIVATE_KEY, 'base64').toString('utf8');
+
+  return jwt.sign(payload, privateKey, {
+    algorithm: 'ES256',
+    header: {
+      alg: 'ES256',
+      kid: ASC_KEY_ID,
+      typ: 'JWT'
+    }
+  });
+}
+
+// GET /v1/appstore/overview - App Store analytics overview
+app.get('/v1/appstore/overview', async (req, res) => {
+  try {
+    const token = generateASCToken();
+    if (!token) {
+      return res.status(503).json({ error: 'App Store Connect not configured', configured: false });
+    }
+
+    const { days = 30 } = req.query;
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Fetch app info and sales/downloads
+    const [appResponse, salesResponse] = await Promise.all([
+      fetch(`https://api.appstoreconnect.apple.com/v1/apps/${ASC_APP_ID}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?filter[reportType]=SALES&filter[reportSubType]=SUMMARY&filter[frequency]=DAILY&filter[vendorNumber]=${ASC_APP_ID}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(() => null) // Sales API may require different permissions
+    ]);
+
+    if (!appResponse.ok) {
+      const errorText = await appResponse.text();
+      console.error('App Store Connect API error:', appResponse.status, errorText);
+      return res.status(appResponse.status).json({
+        error: 'App Store Connect API error',
+        message: errorText,
+        configured: true
+      });
+    }
+
+    const appData = await appResponse.json();
+
+    res.json({
+      configured: true,
+      app: {
+        id: appData.data?.id,
+        name: appData.data?.attributes?.name,
+        bundleId: appData.data?.attributes?.bundleId,
+        sku: appData.data?.attributes?.sku
+      },
+      period: { startDate, endDate, days: parseInt(days) }
+    });
+  } catch (error) {
+    console.error('Error fetching App Store data:', error);
+    res.status(500).json({ error: 'Failed to fetch App Store data', message: error.message });
+  }
+});
+
+// GET /v1/appstore/downloads - Download and install metrics
+app.get('/v1/appstore/downloads', async (req, res) => {
+  try {
+    const token = generateASCToken();
+    if (!token) {
+      return res.status(503).json({ error: 'App Store Connect not configured', configured: false });
+    }
+
+    const { days = 30 } = req.query;
+    const endDate = new Date().toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    // Analytics Reports API for downloads
+    const response = await fetch(
+      `https://api.appstoreconnect.apple.com/v1/analyticsReportRequests`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          data: {
+            type: 'analyticsReportRequests',
+            attributes: {
+              accessType: 'ONGOING'
+            },
+            relationships: {
+              app: {
+                data: { type: 'apps', id: ASC_APP_ID }
+              }
+            }
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      // Fall back to basic app info if analytics not available
+      const appResponse = await fetch(
+        `https://api.appstoreconnect.apple.com/v1/apps/${ASC_APP_ID}/appStoreVersions?filter[appStoreState]=READY_FOR_SALE&include=appStoreVersionLocalizations`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+
+      if (appResponse.ok) {
+        const appData = await appResponse.json();
+        return res.json({
+          configured: true,
+          note: 'Full analytics requires App Analytics Reporter role',
+          currentVersion: appData.data?.[0]?.attributes?.versionString,
+          period: { startDate, endDate, days: parseInt(days) }
+        });
+      }
+    }
+
+    const data = await response.json();
+    res.json({
+      configured: true,
+      analytics: data,
+      period: { startDate, endDate, days: parseInt(days) }
+    });
+  } catch (error) {
+    console.error('Error fetching App Store downloads:', error);
+    res.status(500).json({ error: 'Failed to fetch download data', message: error.message });
+  }
+});
+
+// GET /v1/appstore/ratings - App ratings and reviews
+app.get('/v1/appstore/ratings', async (req, res) => {
+  try {
+    const token = generateASCToken();
+    if (!token) {
+      return res.status(503).json({ error: 'App Store Connect not configured', configured: false });
+    }
+
+    const { limit = 50 } = req.query;
+
+    // Fetch customer reviews
+    const response = await fetch(
+      `https://api.appstoreconnect.apple.com/v1/apps/${ASC_APP_ID}/customerReviews?limit=${limit}&sort=-createdDate`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'App Store Connect API error', message: errorText });
+    }
+
+    const data = await response.json();
+
+    const reviews = (data.data || []).map(review => ({
+      id: review.id,
+      rating: review.attributes?.rating,
+      title: review.attributes?.title,
+      body: review.attributes?.body,
+      reviewerNickname: review.attributes?.reviewerNickname,
+      createdDate: review.attributes?.createdDate,
+      territory: review.attributes?.territory
+    }));
+
+    // Calculate rating distribution
+    const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    reviews.forEach(r => {
+      if (r.rating >= 1 && r.rating <= 5) {
+        ratingCounts[r.rating]++;
+      }
+    });
+
+    const totalReviews = reviews.length;
+    const averageRating = totalReviews > 0
+      ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / totalReviews
+      : 0;
+
+    res.json({
+      configured: true,
+      summary: {
+        totalReviews,
+        averageRating: Math.round(averageRating * 10) / 10,
+        ratingDistribution: ratingCounts
+      },
+      reviews
+    });
+  } catch (error) {
+    console.error('Error fetching App Store ratings:', error);
+    res.status(500).json({ error: 'Failed to fetch ratings', message: error.message });
+  }
+});
+
+// GET /v1/appstore/versions - App version history
+app.get('/v1/appstore/versions', async (req, res) => {
+  try {
+    const token = generateASCToken();
+    if (!token) {
+      return res.status(503).json({ error: 'App Store Connect not configured', configured: false });
+    }
+
+    const response = await fetch(
+      `https://api.appstoreconnect.apple.com/v1/apps/${ASC_APP_ID}/appStoreVersions?limit=10&sort=-createdDate`,
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'App Store Connect API error', message: errorText });
+    }
+
+    const data = await response.json();
+
+    const versions = (data.data || []).map(version => ({
+      id: version.id,
+      versionString: version.attributes?.versionString,
+      appStoreState: version.attributes?.appStoreState,
+      releaseType: version.attributes?.releaseType,
+      createdDate: version.attributes?.createdDate
+    }));
+
+    res.json({ configured: true, versions });
+  } catch (error) {
+    console.error('Error fetching App Store versions:', error);
+    res.status(500).json({ error: 'Failed to fetch versions', message: error.message });
+  }
+});
+
+// ============================================
+// GOOGLE SEARCH CONSOLE API INTEGRATION
+// ============================================
+
+// Helper to get GSC access token
+async function getGSCAccessToken() {
+  if (!GSC_CLIENT_EMAIL || !GSC_PRIVATE_KEY) {
+    return null;
+  }
+
+  try {
+    const privateKey = Buffer.from(GSC_PRIVATE_KEY, 'base64').toString('utf8');
+
+    const auth = new GoogleAuth({
+      credentials: {
+        client_email: GSC_CLIENT_EMAIL,
+        private_key: privateKey
+      },
+      scopes: ['https://www.googleapis.com/auth/webmasters.readonly']
+    });
+
+    const client = await auth.getClient();
+    const token = await client.getAccessToken();
+    return token.token;
+  } catch (error) {
+    console.error('Error getting GSC token:', error);
+    return null;
+  }
+}
+
+// GET /v1/searchconsole/overview - Search Console overview
+app.get('/v1/searchconsole/overview', async (req, res) => {
+  try {
+    const token = await getGSCAccessToken();
+    if (!token) {
+      return res.status(503).json({ error: 'Google Search Console not configured', configured: false });
+    }
+
+    const { days = 28 } = req.query;
+    const endDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]; // 2 days ago (GSC delay)
+    const startDate = new Date(Date.now() - (parseInt(days) + 2) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const response = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE_URL)}/searchAnalytics/query`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ['date'],
+          rowLimit: 1000
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('GSC API error:', response.status, errorText);
+      return res.status(response.status).json({ error: 'Google Search Console API error', message: errorText });
+    }
+
+    const data = await response.json();
+
+    // Calculate totals
+    const rows = data.rows || [];
+    const totals = rows.reduce((acc, row) => ({
+      clicks: acc.clicks + (row.clicks || 0),
+      impressions: acc.impressions + (row.impressions || 0),
+      ctr: 0,
+      position: acc.position + (row.position || 0)
+    }), { clicks: 0, impressions: 0, ctr: 0, position: 0 });
+
+    totals.ctr = totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0;
+    totals.position = rows.length > 0 ? totals.position / rows.length : 0;
+
+    res.json({
+      configured: true,
+      period: { startDate, endDate, days: parseInt(days) },
+      totals: {
+        clicks: totals.clicks,
+        impressions: totals.impressions,
+        ctr: Math.round(totals.ctr * 100) / 100,
+        avgPosition: Math.round(totals.position * 10) / 10
+      },
+      daily: rows.map(row => ({
+        date: row.keys[0],
+        clicks: row.clicks,
+        impressions: row.impressions,
+        ctr: Math.round((row.ctr || 0) * 10000) / 100,
+        position: Math.round((row.position || 0) * 10) / 10
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching Search Console data:', error);
+    res.status(500).json({ error: 'Failed to fetch Search Console data', message: error.message });
+  }
+});
+
+// GET /v1/searchconsole/queries - Top search queries
+app.get('/v1/searchconsole/queries', async (req, res) => {
+  try {
+    const token = await getGSCAccessToken();
+    if (!token) {
+      return res.status(503).json({ error: 'Google Search Console not configured', configured: false });
+    }
+
+    const { days = 28, limit = 100 } = req.query;
+    const endDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - (parseInt(days) + 2) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const response = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE_URL)}/searchAnalytics/query`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ['query'],
+          rowLimit: parseInt(limit)
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'Google Search Console API error', message: errorText });
+    }
+
+    const data = await response.json();
+
+    const queries = (data.rows || []).map(row => ({
+      query: row.keys[0],
+      clicks: row.clicks,
+      impressions: row.impressions,
+      ctr: Math.round((row.ctr || 0) * 10000) / 100,
+      position: Math.round((row.position || 0) * 10) / 10
+    }));
+
+    res.json({
+      configured: true,
+      period: { startDate, endDate, days: parseInt(days) },
+      queries
+    });
+  } catch (error) {
+    console.error('Error fetching Search Console queries:', error);
+    res.status(500).json({ error: 'Failed to fetch queries', message: error.message });
+  }
+});
+
+// GET /v1/searchconsole/pages - Top pages
+app.get('/v1/searchconsole/pages', async (req, res) => {
+  try {
+    const token = await getGSCAccessToken();
+    if (!token) {
+      return res.status(503).json({ error: 'Google Search Console not configured', configured: false });
+    }
+
+    const { days = 28, limit = 50 } = req.query;
+    const endDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - (parseInt(days) + 2) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const response = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE_URL)}/searchAnalytics/query`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ['page'],
+          rowLimit: parseInt(limit)
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'Google Search Console API error', message: errorText });
+    }
+
+    const data = await response.json();
+
+    const pages = (data.rows || []).map(row => ({
+      page: row.keys[0],
+      clicks: row.clicks,
+      impressions: row.impressions,
+      ctr: Math.round((row.ctr || 0) * 10000) / 100,
+      position: Math.round((row.position || 0) * 10) / 10
+    }));
+
+    res.json({
+      configured: true,
+      period: { startDate, endDate, days: parseInt(days) },
+      pages
+    });
+  } catch (error) {
+    console.error('Error fetching Search Console pages:', error);
+    res.status(500).json({ error: 'Failed to fetch pages', message: error.message });
+  }
+});
+
+// GET /v1/searchconsole/devices - Device breakdown
+app.get('/v1/searchconsole/devices', async (req, res) => {
+  try {
+    const token = await getGSCAccessToken();
+    if (!token) {
+      return res.status(503).json({ error: 'Google Search Console not configured', configured: false });
+    }
+
+    const { days = 28 } = req.query;
+    const endDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const startDate = new Date(Date.now() - (parseInt(days) + 2) * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    const response = await fetch(
+      `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE_URL)}/searchAnalytics/query`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          dimensions: ['device']
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({ error: 'Google Search Console API error', message: errorText });
+    }
+
+    const data = await response.json();
+
+    const devices = (data.rows || []).map(row => ({
+      device: row.keys[0],
+      clicks: row.clicks,
+      impressions: row.impressions,
+      ctr: Math.round((row.ctr || 0) * 10000) / 100,
+      position: Math.round((row.position || 0) * 10) / 10
+    }));
+
+    res.json({
+      configured: true,
+      period: { startDate, endDate, days: parseInt(days) },
+      devices
+    });
+  } catch (error) {
+    console.error('Error fetching Search Console devices:', error);
+    res.status(500).json({ error: 'Failed to fetch device data', message: error.message });
+  }
+});
+
+// ============================================
 // UNIFIED INTEGRATIONS STATUS
 // ============================================
 
@@ -2847,6 +3370,16 @@ app.get('/v1/integrations/status', async (req, res) => {
       status: SENTRY_AUTH_TOKEN ? 'active' : 'not_configured',
       org: SENTRY_ORG,
       project: SENTRY_PROJECT
+    },
+    appstore: {
+      configured: !!(ASC_ISSUER_ID && ASC_KEY_ID && ASC_PRIVATE_KEY),
+      status: ASC_ISSUER_ID && ASC_KEY_ID && ASC_PRIVATE_KEY ? 'active' : 'not_configured',
+      app_id: ASC_APP_ID
+    },
+    searchconsole: {
+      configured: !!(GSC_CLIENT_EMAIL && GSC_PRIVATE_KEY),
+      status: GSC_CLIENT_EMAIL && GSC_PRIVATE_KEY ? 'active' : 'not_configured',
+      site_url: GSC_SITE_URL
     }
   };
 
@@ -2879,7 +3412,7 @@ app.get('/v1/integrations/status', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Analytics API running on port ${PORT}`);
-  console.log(`Integrations: Amplitude=${!!AMPLITUDE_API_KEY}, AppsFlyer=${!!APPSFLYER_API_TOKEN}, Sentry=${!!SENTRY_AUTH_TOKEN}`);
+  console.log(`Integrations: Amplitude=${!!AMPLITUDE_API_KEY}, AppsFlyer=${!!APPSFLYER_API_TOKEN}, Sentry=${!!SENTRY_AUTH_TOKEN}, AppStore=${!!ASC_ISSUER_ID}, GSC=${!!GSC_CLIENT_EMAIL}`);
 });
 
 module.exports = app;
