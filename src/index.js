@@ -1448,12 +1448,13 @@ app.post('/webhooks/revenuecat', async (req, res) => {
 // GET /v1/stats/revenuecat-events - Get RevenueCat events for dashboard
 app.get('/v1/stats/revenuecat-events', async (req, res) => {
   try {
-    const { days = 30, limit = 100 } = req.query;
+    const { days = 30, limit = 100, production_only = 'true' } = req.query;
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - parseInt(days));
+    const envFilter = production_only === 'true' ? "AND environment = 'PRODUCTION'" : '';
 
-    const [recentEvents, eventSummary, mrr, churnData] = await Promise.all([
-      // Recent RevenueCat events
+    const [recentEvents, eventSummary, mrr, churnData, prodStats] = await Promise.all([
+      // Recent RevenueCat events (show all for visibility)
       pool.query(`
         SELECT
           event_type, app_user_id, product_id, price, currency,
@@ -1473,19 +1474,20 @@ app.get('/v1/stats/revenuecat-events', async (req, res) => {
         ORDER BY count DESC
       `, [startDate.toISOString()]),
 
-      // MRR calculation (simplified - sum of monthly equivalent revenue)
+      // MRR calculation (PRODUCTION only)
       pool.query(`
         SELECT
           COALESCE(SUM(
             CASE
-              WHEN period_type = 'MONTHLY' THEN price * (takehome_percentage / 100)
-              WHEN period_type = 'ANNUAL' THEN (price / 12) * (takehome_percentage / 100)
+              WHEN period_type = 'MONTHLY' OR product_id LIKE '%monthly%' THEN price * (COALESCE(takehome_percentage, 70) / 100)
+              WHEN period_type = 'ANNUAL' OR product_id LIKE '%yearly%' THEN (price / 12) * (COALESCE(takehome_percentage, 70) / 100)
               ELSE 0
             END
           ), 0) as mrr,
           COUNT(DISTINCT app_user_id) as active_subscribers
         FROM revenuecat_events
         WHERE event_type IN ('INITIAL_PURCHASE', 'RENEWAL')
+        AND environment = 'PRODUCTION'
         AND created_at >= NOW() - INTERVAL '30 days'
       `),
 
@@ -1499,7 +1501,18 @@ app.get('/v1/stats/revenuecat-events', async (req, res) => {
         AND created_at >= $1
         GROUP BY DATE(created_at)
         ORDER BY date DESC
-      `, [startDate.toISOString()])
+      `, [startDate.toISOString()]),
+
+      // Production-only stats for dashboard cards
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT CASE WHEN event_type = 'INITIAL_PURCHASE' THEN app_user_id END) as total_purchases,
+          COALESCE(SUM(CASE WHEN event_type = 'INITIAL_PURCHASE' THEN price ELSE 0 END), 0) as total_revenue,
+          COUNT(DISTINCT app_user_id) as active_subscribers
+        FROM revenuecat_events
+        WHERE environment = 'PRODUCTION'
+        AND event_type IN ('INITIAL_PURCHASE', 'RENEWAL')
+      `)
     ]);
 
     res.json({
@@ -1509,7 +1522,12 @@ app.get('/v1/stats/revenuecat-events', async (req, res) => {
         value: parseFloat(mrr.rows[0].mrr) || 0,
         active_subscribers: parseInt(mrr.rows[0].active_subscribers) || 0
       },
-      churn_by_day: churnData.rows
+      churn_by_day: churnData.rows,
+      production_stats: {
+        total_purchases: parseInt(prodStats.rows[0].total_purchases) || 0,
+        total_revenue: parseFloat(prodStats.rows[0].total_revenue) || 0,
+        active_subscribers: parseInt(prodStats.rows[0].active_subscribers) || 0
+      }
     });
   } catch (error) {
     console.error('Error fetching RevenueCat events:', error);

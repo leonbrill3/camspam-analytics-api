@@ -1951,6 +1951,29 @@
                     </div>
                 </header>
 
+                <div class="stats-grid">
+                    <div class="stat-card revenue">
+                        <div class="stat-label">👥 Active Subscribers</div>
+                        <div class="stat-value" id="rcActiveSubscribers">-</div>
+                        <div class="stat-change neutral">Production only</div>
+                    </div>
+                    <div class="stat-card revenue">
+                        <div class="stat-label">💵 Total Revenue</div>
+                        <div class="stat-value" id="rcTotalRevenue">$0</div>
+                        <div class="stat-change neutral">Production purchases</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🛒 Total Purchases</div>
+                        <div class="stat-value" id="rcTotalPurchases">-</div>
+                        <div class="stat-change neutral">Initial purchases</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📊 MRR</div>
+                        <div class="stat-value" id="rcMRR">$0</div>
+                        <div class="stat-change neutral">Monthly recurring</div>
+                    </div>
+                </div>
+
                 <div class="info-row">
                     <div class="info-card">
                         <div class="info-card-title">🔗 Webhook Status</div>
@@ -3141,25 +3164,38 @@
                 const res = await fetch(`${API_BASE}/v1/stats/revenuecat-events`);
                 const data = await res.json();
 
-                if (data.events?.length > 0) {
+                // Update stats cards with production-only data
+                if (data.production_stats) {
+                    document.getElementById('rcActiveSubscribers').textContent = data.production_stats.active_subscribers || 0;
+                    document.getElementById('rcTotalRevenue').textContent = formatCurrency(data.production_stats.total_revenue);
+                    document.getElementById('rcTotalPurchases').textContent = data.production_stats.total_purchases || 0;
+                }
+                if (data.mrr) {
+                    document.getElementById('rcMRR').textContent = formatCurrency(data.mrr.value);
+                }
+
+                if (data.recent_events?.length > 0) {
                     document.getElementById('webhookStatus').textContent = 'Active';
                     document.getElementById('webhookStatus').style.color = 'var(--accent-green)';
-                    document.getElementById('lastWebhook').textContent = new Date(data.events[0].timestamp).toLocaleString();
+                    document.getElementById('lastWebhook').textContent = new Date(data.recent_events[0].created_at).toLocaleString();
 
                     const feed = document.getElementById('rcEventsFeed');
-                    feed.innerHTML = data.events.map(event => `
-                        <div class="event-item">
+                    feed.innerHTML = data.recent_events.map(event => {
+                        const isProd = event.environment === 'PRODUCTION';
+                        const envBadge = isProd ? '<span style="background:#22c55e;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">PROD</span>' : '<span style="background:#666;color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;margin-left:6px;">SANDBOX</span>';
+                        return `
+                        <div class="event-item" style="${!isProd ? 'opacity:0.5;' : ''}">
                             <div class="event-icon subscription">💳</div>
                             <div class="event-details">
-                                <div class="event-name">${event.type}</div>
-                                <div class="event-meta">${event.product_id || 'N/A'} - ${event.app_user_id?.substring(0, 12) || 'Unknown'}...</div>
+                                <div class="event-name">${event.event_type}${envBadge}</div>
+                                <div class="event-meta">${event.product_id || 'N/A'} - $${event.price || 0}</div>
                             </div>
-                            <div class="event-time">${new Date(event.timestamp).toLocaleTimeString()}</div>
+                            <div class="event-time">${new Date(event.created_at).toLocaleTimeString()}</div>
                         </div>
-                    `).join('');
+                    `}).join('');
                 }
             } catch (e) {
-                console.log('RevenueCat events not available');
+                console.log('RevenueCat events not available:', e);
             }
         }
 
