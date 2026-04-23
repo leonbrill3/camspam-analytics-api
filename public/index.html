@@ -3769,7 +3769,10 @@
                 (overview.attribution_data || []).forEach(row => {
                     const installs = parseInt(row.Installs || row.installs || 0);
                     totalInstalls += installs;
-                    if (row['Media Source'] === 'Organic' || row.media_source === 'organic') {
+                    const source = (row['Media Source'] || row.media_source || '').toLowerCase();
+                    // Organic: explicitly organic OR unknown/unattributed (not from paid campaigns)
+                    // Paid: only explicitly from known paid sources (not unknown)
+                    if (source === 'organic' || source === '' || source === 'unknown' || source === 'none') {
                         organicInstalls += installs;
                     } else {
                         paidInstalls += installs;
