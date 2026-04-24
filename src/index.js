@@ -1550,10 +1550,11 @@ app.get('/v1/stats/monetization', async (req, res) => {
       // Total revenue from production purchases
       pool.query(`
         SELECT
-          COALESCE(SUM(CASE WHEN event_type = 'INITIAL_PURCHASE' THEN price ELSE 0 END), 0) as total_revenue,
-          COUNT(DISTINCT CASE WHEN event_type = 'INITIAL_PURCHASE' THEN app_user_id END) as paying_users
+          COALESCE(SUM(price), 0) as total_revenue,
+          COUNT(DISTINCT app_user_id) as paying_users
         FROM revenuecat_events
         WHERE environment = 'PRODUCTION'
+        AND event_type = 'INITIAL_PURCHASE'
       `),
 
       // MRR calculation
