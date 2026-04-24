@@ -1536,6 +1536,122 @@ app.get('/v1/stats/revenuecat-events', async (req, res) => {
 });
 
 // ============================================
+// MONETIZATION ANALYTICS
+// ============================================
+
+// GET /v1/stats/monetization - Get monetization metrics for dashboard
+app.get('/v1/stats/monetization', async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const [revenueData, mrrData, userCounts, revenueTrend, revenueByPlan, subscriberTrend] = await Promise.all([
+      // Total revenue from production purchases
+      pool.query(`
+        SELECT
+          COALESCE(SUM(CASE WHEN event_type = 'INITIAL_PURCHASE' THEN price ELSE 0 END), 0) as total_revenue,
+          COUNT(DISTINCT CASE WHEN event_type = 'INITIAL_PURCHASE' THEN app_user_id END) as paying_users
+        FROM revenuecat_events
+        WHERE environment = 'PRODUCTION'
+      `),
+
+      // MRR calculation
+      pool.query(`
+        SELECT
+          COALESCE(SUM(
+            CASE
+              WHEN period_type = 'MONTHLY' OR product_id LIKE '%monthly%' THEN price * (COALESCE(takehome_percentage, 70) / 100)
+              WHEN period_type = 'ANNUAL' OR product_id LIKE '%yearly%' THEN (price / 12) * (COALESCE(takehome_percentage, 70) / 100)
+              ELSE 0
+            END
+          ), 0) as mrr,
+          COUNT(DISTINCT app_user_id) as active_subscribers
+        FROM revenuecat_events
+        WHERE event_type IN ('INITIAL_PURCHASE', 'RENEWAL')
+        AND environment = 'PRODUCTION'
+        AND created_at >= NOW() - INTERVAL '30 days'
+      `),
+
+      // Total users count (for ARPU calculation)
+      pool.query(`
+        SELECT COUNT(DISTINCT device_id) as total_users
+        FROM events
+        WHERE timestamp >= $1
+      `, [startDate.toISOString()]),
+
+      // Revenue trend by day
+      pool.query(`
+        SELECT
+          DATE(created_at) as date,
+          SUM(CASE WHEN event_type = 'INITIAL_PURCHASE' THEN price ELSE 0 END) as revenue
+        FROM revenuecat_events
+        WHERE environment = 'PRODUCTION'
+        AND created_at >= $1
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `, [startDate.toISOString()]),
+
+      // Revenue by plan/product
+      pool.query(`
+        SELECT
+          product_id,
+          COUNT(*) as purchases,
+          SUM(price) as revenue
+        FROM revenuecat_events
+        WHERE event_type = 'INITIAL_PURCHASE'
+        AND environment = 'PRODUCTION'
+        GROUP BY product_id
+        ORDER BY revenue DESC
+      `),
+
+      // Subscriber count over time
+      pool.query(`
+        SELECT
+          DATE(created_at) as date,
+          COUNT(DISTINCT app_user_id) as new_subscribers
+        FROM revenuecat_events
+        WHERE event_type = 'INITIAL_PURCHASE'
+        AND environment = 'PRODUCTION'
+        AND created_at >= $1
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `, [startDate.toISOString()])
+    ]);
+
+    const totalRevenue = parseFloat(revenueData.rows[0].total_revenue) || 0;
+    const payingUsers = parseInt(revenueData.rows[0].paying_users) || 0;
+    const totalUsers = parseInt(userCounts.rows[0].total_users) || 1; // Avoid division by zero
+    const mrr = parseFloat(mrrData.rows[0].mrr) || 0;
+    const activeSubscribers = parseInt(mrrData.rows[0].active_subscribers) || 0;
+
+    // Calculate metrics
+    const arpu = totalUsers > 0 ? totalRevenue / totalUsers : 0;
+    const arppu = payingUsers > 0 ? totalRevenue / payingUsers : 0;
+    // LTV estimate: ARPPU * estimated average subscription length (6 months default)
+    const avgSubscriptionMonths = 6;
+    const ltv = arppu * avgSubscriptionMonths;
+
+    res.json({
+      total_revenue: totalRevenue,
+      mrr: mrr,
+      arpu: arpu,
+      arppu: arppu,
+      ltv: ltv,
+      paying_users: payingUsers,
+      total_users: totalUsers,
+      active_subscribers: activeSubscribers,
+      revenue_trend: revenueTrend.rows,
+      revenue_by_plan: revenueByPlan.rows,
+      subscriber_trend: subscriberTrend.rows
+    });
+  } catch (error) {
+    console.error('Error fetching monetization stats:', error);
+    res.status(500).json({ error: 'Failed to fetch monetization stats' });
+  }
+});
+
+// ============================================
 // INDIVIDUAL USER ANALYTICS
 // ============================================
 

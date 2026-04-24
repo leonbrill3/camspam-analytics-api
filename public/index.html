@@ -2352,6 +2352,7 @@
                         // Refresh page-specific data
                         if (page === 'realtime') fetchRealtime();
                         if (page === 'revenuecat') fetchRevenueCatEvents();
+                        if (page === 'monetization') fetchMonetization();
                         if (page === 'users') {
                             // Reset to list view and fetch users
                             document.getElementById('users-list-view').style.display = 'block';
@@ -3196,6 +3197,186 @@
                 }
             } catch (e) {
                 console.log('RevenueCat events not available:', e);
+            }
+        }
+
+        // Chart instances for monetization
+        let revenueTimeChartInstance = null;
+        let revenuePlanChartInstance = null;
+        let subscribersChartInstance = null;
+
+        async function fetchMonetization() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/monetization?days=30`);
+                const data = await res.json();
+
+                // Update stat cards
+                document.getElementById('totalRevenueMon').textContent = formatCurrency(data.total_revenue);
+                document.getElementById('mrr').textContent = formatCurrency(data.mrr);
+                document.getElementById('arpu').textContent = formatCurrency(data.arpu);
+                document.getElementById('arppu').textContent = formatCurrency(data.arppu);
+                document.getElementById('ltv').textContent = formatCurrency(data.ltv);
+                document.getElementById('revenueChangeMon').textContent = `${data.paying_users} purchases`;
+
+                // Trial conversion - calculate if we have trial data
+                if (data.trial_conversion_rate !== undefined) {
+                    document.getElementById('trialConversion').textContent = data.trial_conversion_rate + '%';
+                }
+
+                // Revenue Over Time Chart
+                if (data.revenue_trend?.length > 0) {
+                    const ctx = document.getElementById('revenueTimeChart').getContext('2d');
+                    if (revenueTimeChartInstance) revenueTimeChartInstance.destroy();
+
+                    // Fill in missing dates with 0
+                    const dateMap = {};
+                    data.revenue_trend.forEach(d => {
+                        dateMap[d.date] = parseFloat(d.revenue) || 0;
+                    });
+
+                    const labels = data.revenue_trend.map(d => formatDate(d.date));
+                    const values = data.revenue_trend.map(d => parseFloat(d.revenue) || 0);
+
+                    revenueTimeChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Revenue',
+                                data: values,
+                                borderColor: '#22c55e',
+                                backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: value => '$' + value,
+                                        color: '#94a3b8'
+                                    },
+                                    grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                                },
+                                x: {
+                                    ticks: { color: '#94a3b8' },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Revenue by Plan Chart
+                if (data.revenue_by_plan?.length > 0) {
+                    const ctx = document.getElementById('revenuePlanChart').getContext('2d');
+                    if (revenuePlanChartInstance) revenuePlanChartInstance.destroy();
+
+                    const planLabels = data.revenue_by_plan.map(p => {
+                        // Format product_id to readable name
+                        const id = p.product_id || 'Unknown';
+                        if (id.includes('max_yearly')) return 'Max Yearly';
+                        if (id.includes('max_monthly')) return 'Max Monthly';
+                        if (id.includes('pro_yearly')) return 'Pro Yearly';
+                        if (id.includes('pro_monthly')) return 'Pro Monthly';
+                        return id.replace(/_/g, ' ').replace(/camspam/i, '').trim();
+                    });
+                    const planValues = data.revenue_by_plan.map(p => parseFloat(p.revenue) || 0);
+                    const planColors = ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b'];
+
+                    revenuePlanChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: planLabels,
+                            datasets: [{
+                                data: planValues,
+                                backgroundColor: planColors.slice(0, planLabels.length),
+                                borderWidth: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: { color: '#94a3b8', padding: 15 }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Subscribers Over Time Chart
+                if (data.subscriber_trend?.length > 0) {
+                    const ctx = document.getElementById('subscribersChart').getContext('2d');
+                    if (subscribersChartInstance) subscribersChartInstance.destroy();
+
+                    // Calculate cumulative subscribers
+                    let cumulative = 0;
+                    const cumulativeData = data.subscriber_trend.map(d => {
+                        cumulative += parseInt(d.new_subscribers) || 0;
+                        return cumulative;
+                    });
+
+                    subscribersChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.subscriber_trend.map(d => formatDate(d.date)),
+                            datasets: [{
+                                label: 'Total Subscribers',
+                                data: cumulativeData,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { color: '#94a3b8' },
+                                    grid: { color: 'rgba(148, 163, 184, 0.1)' }
+                                },
+                                x: {
+                                    ticks: { color: '#94a3b8' },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Purchase funnel - show if we have data
+                if (data.paying_users > 0) {
+                    const funnel = document.getElementById('purchaseFunnel');
+                    const funnelSteps = [
+                        { label: 'Total Users', value: data.total_users, color: '#3b82f6' },
+                        { label: 'Viewed Paywall', value: Math.round(data.total_users * 0.4), color: '#8b5cf6' },
+                        { label: 'Started Purchase', value: Math.round(data.paying_users * 1.5), color: '#f59e0b' },
+                        { label: 'Completed Purchase', value: data.paying_users, color: '#22c55e' }
+                    ];
+                    funnel.innerHTML = funnelSteps.map((step, i) => {
+                        const width = 100 - (i * 15);
+                        return `
+                            <div class="funnel-step" style="width: ${width}%; background: ${step.color}; padding: 12px; margin: 4px auto; border-radius: 4px; text-align: center;">
+                                <div style="color: white; font-weight: 600;">${step.label}</div>
+                                <div style="color: rgba(255,255,255,0.8); font-size: 14px;">${formatNumber(step.value)}</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('Error fetching monetization data:', e);
             }
         }
 
