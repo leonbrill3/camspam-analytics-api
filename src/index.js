@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const { GoogleAuth } = require('google-auth-library');
 
 // API Version for tracking deployments
-const API_VERSION = '2.0.3';
+const API_VERSION = '2.0.4';
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -1012,9 +1012,19 @@ app.get('/v1/stats/overview', async (req, res) => {
           topEventsRes.json()
         ]);
 
+        // Log response status
+        console.log('Amplitude API responses:', {
+          users: usersRes.status,
+          events: eventsRes.status,
+          dau: dauRes.status,
+          topEvents: topEventsRes.status
+        });
+
         // Parse Amplitude responses - sum the series array
         if (usersData.data?.series?.[0]) {
           amplitudeData.total_users = usersData.data.series[0].reduce((a, b) => a + b, 0);
+        } else {
+          console.log('No users data series:', JSON.stringify(usersData).slice(0, 200));
         }
         if (eventsData.data?.series?.[0]) {
           amplitudeData.total_events = eventsData.data.series[0].reduce((a, b) => a + b, 0);
@@ -1033,6 +1043,7 @@ app.get('/v1/stats/overview', async (req, res) => {
         }
       } catch (ampError) {
         console.error('Amplitude fetch error:', ampError.message);
+        amplitudeData._error = ampError.message;
       }
     }
 
@@ -1077,7 +1088,11 @@ app.get('/v1/stats/overview', async (req, res) => {
       total_events: amplitudeData.total_events,
       top_events: amplitudeData.top_events,
       revenue: revenueData,
-      _debug: { amplitude_configured: !!(AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY), date_range: { start, end } }
+      _debug: {
+        amplitude_configured: !!(AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY),
+        date_range: { start, end },
+        amplitude_error: amplitudeData._error || null
+      }
     });
   } catch (error) {
     console.error('Error fetching overview:', error);
