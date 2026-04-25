@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const { GoogleAuth } = require('google-auth-library');
 
 // API Version for tracking deployments
-const API_VERSION = '2.1.0';
+const API_VERSION = '2.2.0';
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -978,16 +978,18 @@ app.get('/v1/stats/overview', async (req, res) => {
     const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
     const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
 
-    let amplitudeData = { total_users: 0, total_events: 0, daily_active_users: [], top_events: [] };
+    let amplitudeData = { total_users: 0, total_events: 0, daily_active_users: [], top_events: [], photos_captured: 0, paywall_views: 0 };
     let revenueData = { total: 0, purchases: 0 };
+    let retentionData = { d7: 0 };
 
     // Fetch from Amplitude if configured
     if (AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY) {
       try {
         const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
 
-        // Use endpoints we know work: users (new/active) and events/list
-        const [usersRes, dauRes, topEventsRes] = await Promise.all([
+        // Use endpoints we know work: users (new/active), events/list, retention
+        const retentionParam = encodeURIComponent('{"event_type":"_all"}');
+        const [usersRes, dauRes, topEventsRes, retentionRes] = await Promise.all([
           // Total new users
           fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
             headers: { 'Authorization': `Basic ${authString}` }
@@ -999,13 +1001,18 @@ app.get('/v1/stats/overview', async (req, res) => {
           // Top events
           fetch(`https://amplitude.com/api/2/events/list?start=${start}&end=${end}`, {
             headers: { 'Authorization': `Basic ${authString}` }
+          }),
+          // D7 Retention
+          fetch(`https://amplitude.com/api/2/retention?start=${start}&end=${end}&re=${retentionParam}&se=${retentionParam}`, {
+            headers: { 'Authorization': `Basic ${authString}` }
           })
         ]);
 
-        const [usersData, dauData, topEventsData] = await Promise.all([
+        const [usersData, dauData, topEventsData, retentionDataRes] = await Promise.all([
           usersRes.json(),
           dauRes.json(),
-          topEventsRes.json()
+          topEventsRes.json(),
+          retentionRes.ok ? retentionRes.json() : { data: null }
         ]);
 
         // Parse Amplitude responses - sum the series array
@@ -1024,6 +1031,19 @@ app.get('/v1/stats/overview', async (req, res) => {
           amplitudeData.top_events = topEventsData.data
             .slice(0, 10)
             .map(e => ({ name: e.name, count: e.totals || 0 }));
+
+          // Extract specific event counts
+          const photoEvent = topEventsData.data.find(e => e.name === 'photo_captured');
+          const paywallEvent = topEventsData.data.find(e => e.name === 'paywall_viewed');
+          amplitudeData.photos_captured = photoEvent?.totals || 0;
+          amplitudeData.paywall_views = paywallEvent?.totals || 0;
+        }
+
+        // Parse retention data - D7 retention
+        if (retentionDataRes.data?.combinedRetention) {
+          // D7 is index 7 in the retention array (day 0, 1, 2, ... 7)
+          const d7Value = retentionDataRes.data.combinedRetention[7];
+          retentionData.d7 = d7Value ? Math.round(d7Value * 100) : 0;
         }
       } catch (ampError) {
         console.error('Amplitude fetch error:', ampError.message);
@@ -1065,11 +1085,19 @@ app.get('/v1/stats/overview', async (req, res) => {
       amplitudeData.total_events = parseInt(localEvents.rows[0].count) || 0;
     }
 
+    // Calculate conversion rate: purchases / paywall views
+    const conversionRate = amplitudeData.paywall_views > 0
+      ? Math.round((revenueData.purchases / amplitudeData.paywall_views) * 100)
+      : 0;
+
     res.json({
       total_users: amplitudeData.total_users,
       daily_active_users: amplitudeData.daily_active_users,
       total_events: amplitudeData.total_events,
       top_events: amplitudeData.top_events,
+      photos_captured: amplitudeData.photos_captured,
+      d7_retention: retentionData.d7,
+      conversion_rate: conversionRate,
       revenue: revenueData
     });
   } catch (error) {
@@ -1152,28 +1180,58 @@ app.get('/v1/stats/users', async (req, res) => {
   }
 });
 
-// GET /v1/stats/features - Feature usage analytics
+// GET /v1/stats/features - Feature usage analytics (hybrid: Amplitude + local)
 app.get('/v1/stats/features', async (req, res) => {
   try {
     const { startDate, endDate } = getDateRange(req.query);
 
+    // Format dates for Amplitude API
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    let amplitudeData = {
+      events_list: [],
+      photos_captured: 0,
+      gallery_viewed: 0,
+      feature_toggled: 0,
+      share_initiated: 0
+    };
+
+    // Fetch from Amplitude if configured
+    if (AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY) {
+      try {
+        const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+        const eventsRes = await fetch(`https://amplitude.com/api/2/events/list?start=${start}&end=${end}`, {
+          headers: { 'Authorization': `Basic ${authString}` }
+        });
+        const eventsData = await eventsRes.json();
+
+        if (eventsData.data && Array.isArray(eventsData.data)) {
+          amplitudeData.events_list = eventsData.data;
+          // Extract specific event counts
+          const photoCaptured = eventsData.data.find(e => e.name === 'photo_captured');
+          const galleryViewed = eventsData.data.find(e => e.name === 'gallery_viewed');
+          const featureToggled = eventsData.data.find(e => e.name === 'feature_toggled');
+          const shareInitiated = eventsData.data.find(e => e.name === 'share_initiated');
+
+          amplitudeData.photos_captured = photoCaptured?.totals || 0;
+          amplitudeData.gallery_viewed = galleryViewed?.totals || 0;
+          amplitudeData.feature_toggled = featureToggled?.totals || 0;
+          amplitudeData.share_initiated = shareInitiated?.totals || 0;
+        }
+      } catch (ampError) {
+        console.error('Amplitude features fetch error:', ampError.message);
+      }
+    }
+
+    // Local data for detailed breakdowns (fallback)
     const [
-      photosCaptured,
       photosDeleted,
       scheduleDistribution,
       spamTypeDistribution,
       featureUsage
     ] = await Promise.all([
-      // Photos captured over time
-      pool.query(`
-        SELECT DATE(timestamp) as date, COUNT(*) as count
-        FROM events
-        WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2
-        GROUP BY DATE(timestamp)
-        ORDER BY date DESC
-      `, [startDate.toISOString(), endDate.toISOString()]),
-
-      // Photos deleted (manual vs auto)
       pool.query(`
         SELECT
           properties->>'was_manual' as was_manual,
@@ -1183,7 +1241,6 @@ app.get('/v1/stats/features', async (req, res) => {
         GROUP BY properties->>'was_manual'
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Delete schedule distribution
       pool.query(`
         SELECT
           properties->>'delete_schedule' as schedule,
@@ -1193,7 +1250,6 @@ app.get('/v1/stats/features', async (req, res) => {
         GROUP BY properties->>'delete_schedule'
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Spam type distribution
       pool.query(`
         SELECT
           properties->>'spam_type' as spam_type,
@@ -1203,7 +1259,6 @@ app.get('/v1/stats/features', async (req, res) => {
         GROUP BY properties->>'spam_type'
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Feature toggles
       pool.query(`
         SELECT
           properties->>'feature' as feature,
@@ -1216,7 +1271,13 @@ app.get('/v1/stats/features', async (req, res) => {
     ]);
 
     res.json({
-      photos_captured_by_day: photosCaptured.rows,
+      // Amplitude data (primary)
+      photos_captured: amplitudeData.photos_captured,
+      gallery_viewed: amplitudeData.gallery_viewed,
+      feature_toggled: amplitudeData.feature_toggled,
+      share_initiated: amplitudeData.share_initiated,
+      all_events: amplitudeData.events_list.map(e => ({ name: e.name, count: e.totals || 0 })),
+      // Local data (detailed breakdowns)
       photos_deleted: photosDeleted.rows,
       schedule_distribution: scheduleDistribution.rows,
       spam_type_distribution: spamTypeDistribution.rows,
@@ -2222,13 +2283,14 @@ app.get('/v1/stats/acquisition', async (req, res) => {
       try {
         const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
 
+        const retentionParam = encodeURIComponent('{"event_type":"_all"}');
         const [newUsersRes, retentionRes] = await Promise.all([
           // New users over time
           fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
             headers: { 'Authorization': `Basic ${authString}` }
           }),
           // Retention
-          fetch(`https://amplitude.com/api/2/retention?start=${start}&end=${end}&re={"event_type":"_all"}&se={"event_type":"_all"}`, {
+          fetch(`https://amplitude.com/api/2/retention?start=${start}&end=${end}&re=${retentionParam}&se=${retentionParam}`, {
             headers: { 'Authorization': `Basic ${authString}` }
           })
         ]);
@@ -2244,16 +2306,16 @@ app.get('/v1/stats/acquisition', async (req, res) => {
             date: date,
             installs: newUsersData.data.series[0][i] || 0
           }));
-          amplitudeData.total_new_users = newUsersData.data.seriesCollapsed?.[0] || 0;
+          amplitudeData.total_new_users = newUsersData.data.series[0].reduce((a, b) => a + b, 0);
         }
 
-        // Parse retention data
-        if (retentionData.data?.retentionPercents?.[0]) {
-          const rp = retentionData.data.retentionPercents[0];
+        // Parse retention data - use combinedRetention for overall retention
+        if (retentionData.data?.combinedRetention) {
+          const cr = retentionData.data.combinedRetention;
           amplitudeData.retention = {
-            d1: rp[1] || 0,
-            d7: rp[7] || 0,
-            d30: rp[30] || 0
+            d1: cr[1] ? Math.round(cr[1] * 100) : 0,
+            d7: cr[7] ? Math.round(cr[7] * 100) : 0,
+            d30: cr[30] ? Math.round(cr[30] * 100) : 0
           };
         }
       } catch (ampError) {
