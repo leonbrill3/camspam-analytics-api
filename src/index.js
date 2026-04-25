@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const { GoogleAuth } = require('google-auth-library');
 
 // API Version for tracking deployments
-const API_VERSION = '2.0.6';
+const API_VERSION = '2.1.0';
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -1066,17 +1066,11 @@ app.get('/v1/stats/overview', async (req, res) => {
     }
 
     res.json({
-      api_version: API_VERSION,
       total_users: amplitudeData.total_users,
       daily_active_users: amplitudeData.daily_active_users,
       total_events: amplitudeData.total_events,
       top_events: amplitudeData.top_events,
-      revenue: revenueData,
-      _debug: {
-        amplitude_configured: !!(AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY),
-        date_range: { start, end },
-        amplitude_error: amplitudeData._error || null
-      }
+      revenue: revenueData
     });
   } catch (error) {
     console.error('Error fetching overview:', error);
