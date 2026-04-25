@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const { GoogleAuth } = require('google-auth-library');
 
 // API Version for tracking deployments
-const API_VERSION = '2.0.5';
+const API_VERSION = '2.0.6';
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -986,16 +986,10 @@ app.get('/v1/stats/overview', async (req, res) => {
       try {
         const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
 
-        // URL encode the event type parameter
-        const eventsParam = encodeURIComponent('{"event_type":"_all"}');
-
-        const [usersRes, eventsRes, dauRes, topEventsRes] = await Promise.all([
+        // Use endpoints we know work: users (new/active) and events/list
+        const [usersRes, dauRes, topEventsRes] = await Promise.all([
           // Total new users
           fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
-            headers: { 'Authorization': `Basic ${authString}` }
-          }),
-          // Total events
-          fetch(`https://amplitude.com/api/2/events/sum?start=${start}&end=${end}&e=${eventsParam}`, {
             headers: { 'Authorization': `Basic ${authString}` }
           }),
           // DAU series
@@ -1008,29 +1002,15 @@ app.get('/v1/stats/overview', async (req, res) => {
           })
         ]);
 
-        const [usersData, eventsData, dauData, topEventsData] = await Promise.all([
+        const [usersData, dauData, topEventsData] = await Promise.all([
           usersRes.json(),
-          eventsRes.json(),
           dauRes.json(),
           topEventsRes.json()
         ]);
 
-        // Log response status
-        console.log('Amplitude API responses:', {
-          users: usersRes.status,
-          events: eventsRes.status,
-          dau: dauRes.status,
-          topEvents: topEventsRes.status
-        });
-
         // Parse Amplitude responses - sum the series array
         if (usersData.data?.series?.[0]) {
           amplitudeData.total_users = usersData.data.series[0].reduce((a, b) => a + b, 0);
-        } else {
-          console.log('No users data series:', JSON.stringify(usersData).slice(0, 200));
-        }
-        if (eventsData.data?.series?.[0]) {
-          amplitudeData.total_events = eventsData.data.series[0].reduce((a, b) => a + b, 0);
         }
         if (dauData.data?.series?.[0] && dauData.data?.xValues) {
           amplitudeData.daily_active_users = dauData.data.xValues.map((date, i) => ({
@@ -1038,8 +1018,9 @@ app.get('/v1/stats/overview', async (req, res) => {
             count: dauData.data.series[0][i] || 0
           }));
         }
-        // Top events - transform to [{name, count}] format
+        // Top events - sum totals for total_events and transform to [{name, count}] format
         if (topEventsData.data && Array.isArray(topEventsData.data)) {
+          amplitudeData.total_events = topEventsData.data.reduce((sum, e) => sum + (e.totals || 0), 0);
           amplitudeData.top_events = topEventsData.data
             .slice(0, 10)
             .map(e => ({ name: e.name, count: e.totals || 0 }));
