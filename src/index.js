@@ -966,77 +966,102 @@ app.post('/v1/events', async (req, res) => {
 // DASHBOARD API
 // ============================================
 
-// GET /v1/stats/overview - Dashboard overview stats
+// GET /v1/stats/overview - Dashboard overview stats (hybrid: Amplitude + RevenueCat)
 app.get('/v1/stats/overview', async (req, res) => {
   try {
     const { startDate, endDate } = getDateRange(req.query);
 
-    const [
-      totalUsers,
-      dailyActiveUsers,
-      totalEvents,
-      topEvents,
-      revenue
-    ] = await Promise.all([
-      // Total unique devices (users)
-      pool.query(`
-        SELECT COUNT(DISTINCT device_id) as count
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2
-      `, [startDate.toISOString(), endDate.toISOString()]),
+    // Format dates for Amplitude API
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
 
-      // Daily active users within date range
-      pool.query(`
-        SELECT DATE(timestamp) as date, COUNT(DISTINCT device_id) as count
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2
-        GROUP BY DATE(timestamp)
-        ORDER BY date DESC
-      `, [startDate.toISOString(), endDate.toISOString()]),
+    let amplitudeData = { total_users: 0, total_events: 0, daily_active_users: [], top_events: [] };
+    let revenueData = { total: 0, purchases: 0 };
 
-      // Total events
-      pool.query(`
-        SELECT COUNT(*) as count
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2
-      `, [startDate.toISOString(), endDate.toISOString()]),
+    // Fetch from Amplitude if configured
+    if (AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY) {
+      try {
+        const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
 
-      // Top 10 events by count
-      pool.query(`
-        SELECT name, COUNT(*) as count
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2
-        GROUP BY name
-        ORDER BY count DESC
-        LIMIT 10
-      `, [startDate.toISOString(), endDate.toISOString()]),
+        const [usersRes, eventsRes, dauRes] = await Promise.all([
+          // Total new users
+          fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          }),
+          // Total events
+          fetch(`https://amplitude.com/api/2/events/sum?start=${start}&end=${end}&e={"event_type":"_all"}`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          }),
+          // DAU series
+          fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=active`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          })
+        ]);
 
-      // Revenue from purchase events
-      pool.query(`
+        const [usersData, eventsData, dauData] = await Promise.all([
+          usersRes.json(),
+          eventsRes.json(),
+          dauRes.json()
+        ]);
+
+        // Parse Amplitude responses
+        if (usersData.data?.seriesCollapsed?.[0]) {
+          amplitudeData.total_users = usersData.data.seriesCollapsed[0];
+        }
+        if (eventsData.data?.seriesCollapsed?.[0]) {
+          amplitudeData.total_events = eventsData.data.seriesCollapsed[0];
+        }
+        if (dauData.data?.series?.[0] && dauData.data?.xValues) {
+          amplitudeData.daily_active_users = dauData.data.xValues.map((date, i) => ({
+            date: date,
+            count: dauData.data.series[0][i] || 0
+          }));
+        }
+      } catch (ampError) {
+        console.error('Amplitude fetch error:', ampError.message);
+      }
+    }
+
+    // Fetch revenue from RevenueCat events table
+    try {
+      const rcResult = await pool.query(`
         SELECT
-          COALESCE(SUM((properties->>'revenue')::numeric), 0) as total_revenue,
-          COUNT(*) as purchase_count
-        FROM events
-        WHERE name = 'purchase_completed'
-        AND timestamp >= $1 AND timestamp <= $2
-      `, [startDate.toISOString(), endDate.toISOString()])
-    ]);
+          COALESCE(SUM(CASE WHEN event_type = 'INITIAL_PURCHASE' THEN price ELSE 0 END), 0) as total_revenue,
+          COUNT(CASE WHEN event_type = 'INITIAL_PURCHASE' THEN 1 END) as purchase_count
+        FROM revenuecat_events
+        WHERE environment = 'PRODUCTION'
+        AND created_at >= $1 AND created_at <= $2
+      `, [startDate.toISOString(), endDate.toISOString()]);
+
+      revenueData.total = parseFloat(rcResult.rows[0].total_revenue) || 0;
+      revenueData.purchases = parseInt(rcResult.rows[0].purchase_count) || 0;
+    } catch (rcError) {
+      console.error('RevenueCat fetch error:', rcError.message);
+    }
+
+    // Fallback to local events table if Amplitude returned nothing
+    if (amplitudeData.total_users === 0) {
+      const localUsers = await pool.query(`
+        SELECT COUNT(DISTINCT device_id) as count FROM events
+        WHERE timestamp >= $1 AND timestamp <= $2
+      `, [startDate.toISOString(), endDate.toISOString()]);
+      amplitudeData.total_users = parseInt(localUsers.rows[0].count) || 0;
+    }
+
+    if (amplitudeData.total_events === 0) {
+      const localEvents = await pool.query(`
+        SELECT COUNT(*) as count FROM events
+        WHERE timestamp >= $1 AND timestamp <= $2
+      `, [startDate.toISOString(), endDate.toISOString()]);
+      amplitudeData.total_events = parseInt(localEvents.rows[0].count) || 0;
+    }
 
     res.json({
-      total_users: parseInt(totalUsers.rows[0].count),
-      daily_active_users: dailyActiveUsers.rows.map(r => ({
-        date: r.date,
-        count: parseInt(r.count)
-      })),
-      total_events: parseInt(totalEvents.rows[0].count),
-      top_events: topEvents.rows.map(r => ({
-        name: r.name,
-        count: parseInt(r.count)
-      })),
-      revenue: {
-        total: parseFloat(revenue.rows[0].total_revenue),
-        purchases: parseInt(revenue.rows[0].purchase_count)
-      }
+      total_users: amplitudeData.total_users,
+      daily_active_users: amplitudeData.daily_active_users,
+      total_events: amplitudeData.total_events,
+      top_events: amplitudeData.top_events,
+      revenue: revenueData
     });
   } catch (error) {
     console.error('Error fetching overview:', error);
@@ -2168,134 +2193,115 @@ app.get('/v1/users/funnel-dropoff', async (req, res) => {
   }
 });
 
-// GET /v1/stats/acquisition - Attribution and acquisition analytics
+// GET /v1/stats/acquisition - Attribution and acquisition analytics (hybrid: Amplitude + local)
 app.get('/v1/stats/acquisition', async (req, res) => {
   try {
     const { startDate, endDate } = getDateRange(req.query);
 
+    // Format dates for Amplitude API
+    const start = startDate.toISOString().split('T')[0].replace(/-/g, '');
+    const end = endDate.toISOString().split('T')[0].replace(/-/g, '');
+
+    let amplitudeData = {
+      new_users_by_day: [],
+      total_new_users: 0,
+      retention: { d1: 0, d7: 0, d30: 0 }
+    };
+
+    // Fetch from Amplitude if configured
+    if (AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY) {
+      try {
+        const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+        const [newUsersRes, retentionRes] = await Promise.all([
+          // New users over time
+          fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          }),
+          // Retention
+          fetch(`https://amplitude.com/api/2/retention?start=${start}&end=${end}&re={"event_type":"_all"}&se={"event_type":"_all"}`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          })
+        ]);
+
+        const [newUsersData, retentionData] = await Promise.all([
+          newUsersRes.json(),
+          retentionRes.json()
+        ]);
+
+        // Parse new users by day
+        if (newUsersData.data?.series?.[0] && newUsersData.data?.xValues) {
+          amplitudeData.new_users_by_day = newUsersData.data.xValues.map((date, i) => ({
+            date: date,
+            installs: newUsersData.data.series[0][i] || 0
+          }));
+          amplitudeData.total_new_users = newUsersData.data.seriesCollapsed?.[0] || 0;
+        }
+
+        // Parse retention data
+        if (retentionData.data?.retentionPercents?.[0]) {
+          const rp = retentionData.data.retentionPercents[0];
+          amplitudeData.retention = {
+            d1: rp[1] || 0,
+            d7: rp[7] || 0,
+            d30: rp[30] || 0
+          };
+        }
+      } catch (ampError) {
+        console.error('Amplitude acquisition fetch error:', ampError.message);
+      }
+    }
+
+    // Get local data for breakdowns (device, geo, etc.) - fallback
     const [
-      installsByDay,
-      installsBySource,
-      organicVsPaid,
       deviceBreakdown,
       geoBreakdown,
       timezoneBreakdown,
       languageBreakdown,
       osBreakdown
     ] = await Promise.all([
-      // New installs by day
-      pool.query(`
-        WITH first_events AS (
-          SELECT device_id, MIN(timestamp) as first_seen
-          FROM events
-          GROUP BY device_id
-        )
-        SELECT DATE(first_seen) as date, COUNT(*) as installs
-        FROM first_events
-        WHERE first_seen >= $1 AND first_seen <= $2
-        GROUP BY DATE(first_seen)
-        ORDER BY date DESC
-      `, [startDate.toISOString(), endDate.toISOString()]),
-
-      // Installs by attribution source
-      pool.query(`
-        WITH first_events AS (
-          SELECT device_id, MIN(timestamp) as first_seen,
-                 (SELECT properties->>'source' FROM events e2
-                  WHERE e2.device_id = events.device_id
-                  AND e2.name = 'app_opened'
-                  ORDER BY timestamp LIMIT 1) as source
-          FROM events
-          GROUP BY device_id
-        )
-        SELECT COALESCE(source, 'organic') as source, COUNT(*) as installs
-        FROM first_events
-        WHERE first_seen >= $1 AND first_seen <= $2
-        GROUP BY source
-        ORDER BY installs DESC
-      `, [startDate.toISOString(), endDate.toISOString()]),
-
-      // Organic vs Paid
-      pool.query(`
-        WITH first_events AS (
-          SELECT device_id, MIN(timestamp) as first_seen,
-                 (SELECT properties->>'is_organic' FROM events e2
-                  WHERE e2.device_id = events.device_id
-                  AND e2.name = 'app_opened'
-                  ORDER BY timestamp LIMIT 1) as is_organic
-          FROM events
-          GROUP BY device_id
-        )
-        SELECT
-          COUNT(CASE WHEN is_organic = 'true' OR is_organic IS NULL THEN 1 END) as organic,
-          COUNT(CASE WHEN is_organic = 'false' THEN 1 END) as paid
-        FROM first_events
-        WHERE first_seen >= $1 AND first_seen <= $2
-      `, [startDate.toISOString(), endDate.toISOString()]),
-
-      // Device model breakdown
       pool.query(`
         SELECT device_model, COUNT(DISTINCT device_id) as users
         FROM events
         WHERE timestamp >= $1 AND timestamp <= $2 AND device_model IS NOT NULL
-        GROUP BY device_model
-        ORDER BY users DESC
-        LIMIT 10
+        GROUP BY device_model ORDER BY users DESC LIMIT 10
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Geographic breakdown by locale/timezone
       pool.query(`
-        SELECT
-          COALESCE(NULLIF(SPLIT_PART(locale, '_', 2), ''), locale, 'Unknown') as country,
-          COUNT(DISTINCT device_id) as users
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2 AND locale IS NOT NULL
-        GROUP BY country
-        ORDER BY users DESC
-        LIMIT 10
+        SELECT COALESCE(NULLIF(SPLIT_PART(locale, '_', 2), ''), locale, 'Unknown') as country,
+               COUNT(DISTINCT device_id) as users
+        FROM events WHERE timestamp >= $1 AND timestamp <= $2 AND locale IS NOT NULL
+        GROUP BY country ORDER BY users DESC LIMIT 10
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Timezone distribution
       pool.query(`
-        SELECT
-          timezone,
-          COUNT(DISTINCT device_id) as users
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2 AND timezone IS NOT NULL
-        GROUP BY timezone
-        ORDER BY users DESC
-        LIMIT 15
+        SELECT timezone, COUNT(DISTINCT device_id) as users
+        FROM events WHERE timestamp >= $1 AND timestamp <= $2 AND timezone IS NOT NULL
+        GROUP BY timezone ORDER BY users DESC LIMIT 15
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // Language breakdown
       pool.query(`
-        SELECT
-          COALESCE(SPLIT_PART(locale, '_', 1), 'unknown') as language,
-          COUNT(DISTINCT device_id) as users
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2 AND locale IS NOT NULL
-        GROUP BY language
-        ORDER BY users DESC
-        LIMIT 10
+        SELECT COALESCE(SPLIT_PART(locale, '_', 1), 'unknown') as language,
+               COUNT(DISTINCT device_id) as users
+        FROM events WHERE timestamp >= $1 AND timestamp <= $2 AND locale IS NOT NULL
+        GROUP BY language ORDER BY users DESC LIMIT 10
       `, [startDate.toISOString(), endDate.toISOString()]),
 
-      // OS version breakdown
       pool.query(`
-        SELECT
-          os_version,
-          COUNT(DISTINCT device_id) as users
-        FROM events
-        WHERE timestamp >= $1 AND timestamp <= $2 AND os_version IS NOT NULL
-        GROUP BY os_version
-        ORDER BY users DESC
-        LIMIT 10
+        SELECT os_version, COUNT(DISTINCT device_id) as users
+        FROM events WHERE timestamp >= $1 AND timestamp <= $2 AND os_version IS NOT NULL
+        GROUP BY os_version ORDER BY users DESC LIMIT 10
       `, [startDate.toISOString(), endDate.toISOString()])
     ]);
 
     res.json({
-      installs_by_day: installsByDay.rows,
-      installs_by_source: installsBySource.rows,
-      organic_vs_paid: organicVsPaid.rows[0] || { organic: 0, paid: 0 },
+      // Amplitude data (primary)
+      installs_by_day: amplitudeData.new_users_by_day,
+      total_new_users: amplitudeData.total_new_users,
+      retention: amplitudeData.retention,
+      // Local data (breakdowns)
+      installs_by_source: [{ source: 'organic', installs: amplitudeData.total_new_users }],
+      organic_vs_paid: { organic: amplitudeData.total_new_users, paid: 0 },
       device_breakdown: deviceBreakdown.rows,
       geo_breakdown: geoBreakdown.rows,
       timezone_breakdown: timezoneBreakdown.rows,
