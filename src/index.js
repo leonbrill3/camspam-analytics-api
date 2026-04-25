@@ -3544,6 +3544,184 @@ app.get('/v1/integrations/status', async (req, res) => {
   res.json(status);
 });
 
+// ============================================
+// AMPLITUDE DATA SYNC
+// ============================================
+
+// Helper to decompress gzip response
+const zlib = require('zlib');
+const { promisify } = require('util');
+const gunzip = promisify(zlib.gunzip);
+
+// Sync events from Amplitude Export API to local database
+async function syncAmplitudeEvents(startDate, endDate) {
+  if (!AMPLITUDE_API_KEY || !AMPLITUDE_SECRET_KEY) {
+    throw new Error('Amplitude not configured');
+  }
+
+  const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+
+  // Format dates as YYYYMMDDTHH
+  const start = startDate.replace(/-/g, '') + 'T00';
+  const end = endDate.replace(/-/g, '') + 'T23';
+
+  console.log(`[Amplitude Sync] Fetching events from ${start} to ${end}`);
+
+  const response = await fetch(
+    `https://amplitude.com/api/2/export?start=${start}&end=${end}`,
+    { headers: { 'Authorization': `Basic ${authString}` } }
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      console.log('[Amplitude Sync] No data available for this time range');
+      return { synced: 0, skipped: 0, errors: 0 };
+    }
+    throw new Error(`Amplitude API error: ${response.status} ${response.statusText}`);
+  }
+
+  // Response is a gzipped file containing JSON lines
+  const buffer = await response.arrayBuffer();
+  let content;
+  try {
+    content = await gunzip(Buffer.from(buffer));
+  } catch (e) {
+    // If not gzipped, use as-is
+    content = Buffer.from(buffer);
+  }
+
+  const lines = content.toString('utf-8').split('\n').filter(line => line.trim());
+  console.log(`[Amplitude Sync] Processing ${lines.length} events`);
+
+  let synced = 0, skipped = 0, errors = 0;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const line of lines) {
+      try {
+        const event = JSON.parse(line);
+
+        // Check if event already exists (by device_id + timestamp + event_type)
+        const exists = await client.query(
+          `SELECT 1 FROM events WHERE device_id = $1 AND name = $2 AND timestamp = $3 LIMIT 1`,
+          [event.device_id, event.event_type, event.event_time || event.server_received_time]
+        );
+
+        if (exists.rows.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        // Insert event
+        await client.query(`
+          INSERT INTO events (
+            name, category, properties, timestamp,
+            user_id, device_id, session_id,
+            app_version, platform, os_version,
+            device_model, locale, timezone
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `, [
+          event.event_type,
+          event.event_properties?.category || 'engagement',
+          JSON.stringify(event.event_properties || {}),
+          event.event_time || event.server_received_time,
+          event.user_id,
+          event.device_id,
+          event.session_id ? String(event.session_id) : null,
+          event.app_version,
+          event.platform || 'ios',
+          event.os_version,
+          event.device_type,
+          event.language,
+          event.timezone || null
+        ]);
+        synced++;
+      } catch (e) {
+        console.error('[Amplitude Sync] Error processing event:', e.message);
+        errors++;
+      }
+    }
+
+    await client.query('COMMIT');
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  console.log(`[Amplitude Sync] Complete: ${synced} synced, ${skipped} skipped, ${errors} errors`);
+  return { synced, skipped, errors };
+}
+
+// POST /v1/amplitude/sync - Trigger manual sync from Amplitude
+app.post('/v1/amplitude/sync', requireAuth, async (req, res) => {
+  try {
+    const { days = 7 } = req.body;
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    const result = await syncAmplitudeEvents(
+      startDate.toISOString().split('T')[0],
+      endDate.toISOString().split('T')[0]
+    );
+
+    res.json({
+      success: true,
+      message: `Synced ${result.synced} events from Amplitude`,
+      ...result
+    });
+  } catch (error) {
+    console.error('Amplitude sync error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /v1/amplitude/sync/status - Check last sync status
+app.get('/v1/amplitude/sync/status', async (req, res) => {
+  try {
+    // Get the most recent event timestamp and count
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as total_events,
+        COUNT(DISTINCT device_id) as unique_users,
+        MAX(timestamp) as latest_event,
+        MIN(timestamp) as earliest_event
+      FROM events
+    `);
+
+    res.json({
+      configured: !!(AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY),
+      ...result.rows[0]
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Auto-sync on startup (last 30 days) - runs in background
+if (AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY) {
+  setTimeout(async () => {
+    try {
+      console.log('[Amplitude Sync] Running startup sync (last 30 days)...');
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 30);
+
+      await syncAmplitudeEvents(
+        startDate.toISOString().split('T')[0],
+        endDate.toISOString().split('T')[0]
+      );
+    } catch (e) {
+      console.error('[Amplitude Sync] Startup sync failed:', e.message);
+    }
+  }, 5000); // Wait 5 seconds after startup
+}
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Analytics API running on port ${PORT}`);
