@@ -983,7 +983,7 @@ app.get('/v1/stats/overview', async (req, res) => {
       try {
         const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
 
-        const [usersRes, eventsRes, dauRes] = await Promise.all([
+        const [usersRes, eventsRes, dauRes, topEventsRes] = await Promise.all([
           // Total new users
           fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=new`, {
             headers: { 'Authorization': `Basic ${authString}` }
@@ -995,27 +995,38 @@ app.get('/v1/stats/overview', async (req, res) => {
           // DAU series
           fetch(`https://amplitude.com/api/2/users?start=${start}&end=${end}&m=active`, {
             headers: { 'Authorization': `Basic ${authString}` }
+          }),
+          // Top events
+          fetch(`https://amplitude.com/api/2/events/list?start=${start}&end=${end}`, {
+            headers: { 'Authorization': `Basic ${authString}` }
           })
         ]);
 
-        const [usersData, eventsData, dauData] = await Promise.all([
+        const [usersData, eventsData, dauData, topEventsData] = await Promise.all([
           usersRes.json(),
           eventsRes.json(),
-          dauRes.json()
+          dauRes.json(),
+          topEventsRes.json()
         ]);
 
-        // Parse Amplitude responses
-        if (usersData.data?.seriesCollapsed?.[0]) {
-          amplitudeData.total_users = usersData.data.seriesCollapsed[0];
+        // Parse Amplitude responses - sum the series array
+        if (usersData.data?.series?.[0]) {
+          amplitudeData.total_users = usersData.data.series[0].reduce((a, b) => a + b, 0);
         }
-        if (eventsData.data?.seriesCollapsed?.[0]) {
-          amplitudeData.total_events = eventsData.data.seriesCollapsed[0];
+        if (eventsData.data?.series?.[0]) {
+          amplitudeData.total_events = eventsData.data.series[0].reduce((a, b) => a + b, 0);
         }
         if (dauData.data?.series?.[0] && dauData.data?.xValues) {
           amplitudeData.daily_active_users = dauData.data.xValues.map((date, i) => ({
             date: date,
             count: dauData.data.series[0][i] || 0
           }));
+        }
+        // Top events - transform to [{name, count}] format
+        if (topEventsData.data && Array.isArray(topEventsData.data)) {
+          amplitudeData.top_events = topEventsData.data
+            .slice(0, 10)
+            .map(e => ({ name: e.name, count: e.totals || 0 }));
         }
       } catch (ampError) {
         console.error('Amplitude fetch error:', ampError.message);
