@@ -1120,6 +1120,10 @@
                     <span class="nav-item-icon">📱</span>
                     <span>Product Usage</span>
                 </div>
+                <div class="nav-item" data-page="feature-usage">
+                    <span class="nav-item-icon">🎯</span>
+                    <span>Feature Usage</span>
+                </div>
                 <div class="nav-item" data-page="realtime">
                     <span class="nav-item-icon">🔴</span>
                     <span>Real-Time</span>
@@ -1535,6 +1539,82 @@
                         <div class="chart-container">
                             <canvas id="eventsTimeChart"></canvas>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== FEATURE USAGE PAGE ==================== -->
+            <section class="page-section" id="page-feature-usage">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Feature Usage</h1>
+                        <p class="page-subtitle">Detailed feature adoption and usage metrics</p>
+                    </div>
+                </header>
+
+                <div class="stats-grid">
+                    <div class="stat-card photos">
+                        <div class="stat-label">📸 Photos Captured</div>
+                        <div class="stat-value" id="featurePhotosCaptured">-</div>
+                        <div class="stat-change neutral">Total photos taken</div>
+                    </div>
+                    <div class="stat-card events">
+                        <div class="stat-label">🔍 Photos Scanned</div>
+                        <div class="stat-value" id="featurePhotosScanned">-</div>
+                        <div class="stat-change neutral">Total photos analyzed</div>
+                    </div>
+                    <div class="stat-card conversion">
+                        <div class="stat-label">🔄 Total Scans</div>
+                        <div class="stat-value" id="featureScansTotal">-</div>
+                        <div class="stat-change neutral">Scan operations started</div>
+                    </div>
+                    <div class="stat-card users">
+                        <div class="stat-label">☁️ iCloud Backups On</div>
+                        <div class="stat-value" id="featureICloudEnabled">-</div>
+                        <div class="stat-change neutral">Users who enabled backup</div>
+                    </div>
+                </div>
+
+                <h2 style="margin: 32px 0 16px; font-size: 18px; color: var(--text-secondary);">📊 Scan Type Breakdown</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">📅 7 Days Scans</div>
+                        <div class="stat-value" id="featureScans7Days">-</div>
+                        <div class="stat-change neutral">Last 7 days range</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📅 30 Days Scans</div>
+                        <div class="stat-value" id="featureScans30Days">-</div>
+                        <div class="stat-change neutral">Last 30 days range</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📅 6 Months Scans</div>
+                        <div class="stat-value" id="featureScans6Months">-</div>
+                        <div class="stat-change neutral">Last 6 months range</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📅 All Photos Scans</div>
+                        <div class="stat-value" id="featureScansAll">-</div>
+                        <div class="stat-change neutral">Full library scans</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📅 Custom Range Scans</div>
+                        <div class="stat-value" id="featureScansCustom">-</div>
+                        <div class="stat-change neutral">Custom date range</div>
+                    </div>
+                </div>
+
+                <h2 style="margin: 32px 0 16px; font-size: 18px; color: var(--text-secondary);">🚀 Quick Actions</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">📲 Widget Clicks</div>
+                        <div class="stat-value" id="featureWidgetClicks">-</div>
+                        <div class="stat-change neutral">Lock screen widget taps</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">⚡ Shortcut Taps</div>
+                        <div class="stat-value" id="featureShortcutTaps">-</div>
+                        <div class="stat-change neutral">Screenshot shortcut uses</div>
                     </div>
                 </div>
             </section>
@@ -2353,6 +2433,7 @@
                         if (page === 'realtime') fetchRealtime();
                         if (page === 'revenuecat') fetchRevenueCatEvents();
                         if (page === 'monetization') fetchMonetization();
+                        if (page === 'feature-usage') fetchFeatureUsage();
                         if (page === 'users') {
                             // Reset to list view and fetch users
                             document.getElementById('users-list-view').style.display = 'block';
@@ -3413,6 +3494,61 @@
                 }
             } catch (e) {
                 console.error('Error fetching monetization data:', e);
+            }
+        }
+
+        async function fetchFeatureUsage() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/feature-usage?${getDateParams()}`);
+                const data = await res.json();
+
+                // Photos captured
+                if (data.photos_captured !== undefined) {
+                    document.getElementById('featurePhotosCaptured').textContent = formatNumber(data.photos_captured);
+                }
+
+                // Photos scanned
+                if (data.photos_scanned !== undefined) {
+                    document.getElementById('featurePhotosScanned').textContent = formatNumber(data.photos_scanned);
+                }
+
+                // Total scans
+                if (data.scans_total !== undefined) {
+                    document.getElementById('featureScansTotal').textContent = formatNumber(data.scans_total);
+                }
+
+                // iCloud backups enabled
+                if (data.icloud_backup_enabled !== undefined) {
+                    document.getElementById('featureICloudEnabled').textContent = formatNumber(data.icloud_backup_enabled);
+                }
+
+                // Scan type breakdown
+                if (data.scans_7days !== undefined) {
+                    document.getElementById('featureScans7Days').textContent = formatNumber(data.scans_7days);
+                }
+                if (data.scans_30days !== undefined) {
+                    document.getElementById('featureScans30Days').textContent = formatNumber(data.scans_30days);
+                }
+                if (data.scans_6months !== undefined) {
+                    document.getElementById('featureScans6Months').textContent = formatNumber(data.scans_6months);
+                }
+                if (data.scans_all !== undefined) {
+                    document.getElementById('featureScansAll').textContent = formatNumber(data.scans_all);
+                }
+                if (data.scans_custom !== undefined) {
+                    document.getElementById('featureScansCustom').textContent = formatNumber(data.scans_custom);
+                }
+
+                // Quick actions
+                if (data.widget_clicks !== undefined) {
+                    document.getElementById('featureWidgetClicks').textContent = formatNumber(data.widget_clicks);
+                }
+                if (data.shortcut_taps !== undefined) {
+                    document.getElementById('featureShortcutTaps').textContent = formatNumber(data.shortcut_taps);
+                }
+
+            } catch (e) {
+                console.error('Error fetching feature usage data:', e);
             }
         }
 
