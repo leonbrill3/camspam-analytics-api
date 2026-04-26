@@ -12,7 +12,7 @@ const jwt = require('jsonwebtoken');
 const { GoogleAuth } = require('google-auth-library');
 
 // API Version for tracking deployments
-const API_VERSION = '2.2.0';
+const API_VERSION = '2.3.0';
 
 // ============================================
 // THIRD-PARTY API CONFIGURATION
@@ -1334,44 +1334,92 @@ app.get('/v1/stats/funnel', async (req, res) => {
   }
 });
 
-// GET /v1/stats/realtime - Real-time stats (last hour)
+// GET /v1/stats/realtime - Real-time stats (hybrid: Amplitude + local)
 app.get('/v1/stats/realtime', async (req, res) => {
   try {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    let amplitudeData = {
+      active_users: 0,
+      events_today: 0,
+      photos_today: 0,
+      revenue_today: 0,
+      recent_events: [],
+      events_per_minute: []
+    };
 
-    const [activeUsers, recentEvents, eventsByMinute] = await Promise.all([
-      // Active users in last hour
-      pool.query(`
-        SELECT COUNT(DISTINCT device_id) as count
-        FROM events
-        WHERE timestamp >= $1
-      `, [oneHourAgo]),
+    // Try Amplitude API for real-time-ish data
+    if (AMPLITUDE_API_KEY && AMPLITUDE_SECRET_KEY) {
+      try {
+        const authString = Buffer.from(`${AMPLITUDE_API_KEY}:${AMPLITUDE_SECRET_KEY}`).toString('base64');
+        const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
 
-      // Most recent events
-      pool.query(`
-        SELECT name, timestamp, device_id, properties
-        FROM events
-        WHERE timestamp >= $1
-        ORDER BY timestamp DESC
-        LIMIT 50
-      `, [oneHourAgo]),
+        const [activeUsersRes, eventsRes] = await Promise.all([
+          // Active users today
+          fetch(`https://amplitude.com/api/2/users?start=${today}&end=${today}&m=active`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          }),
+          // Events list for today
+          fetch(`https://amplitude.com/api/2/events/list?start=${today}&end=${today}`, {
+            headers: { 'Authorization': `Basic ${authString}` }
+          })
+        ]);
 
-      // Events per minute
-      pool.query(`
-        SELECT
-          DATE_TRUNC('minute', timestamp) as minute,
-          COUNT(*) as count
-        FROM events
-        WHERE timestamp >= $1
-        GROUP BY DATE_TRUNC('minute', timestamp)
-        ORDER BY minute DESC
-      `, [oneHourAgo])
-    ]);
+        if (activeUsersRes.ok) {
+          const activeData = await activeUsersRes.json();
+          if (activeData.data?.series?.[0]) {
+            amplitudeData.active_users = activeData.data.series[0].reduce((a, b) => a + b, 0);
+          }
+        }
+
+        if (eventsRes.ok) {
+          const eventsData = await eventsRes.json();
+          if (eventsData.data) {
+            // Sum all event totals for today
+            amplitudeData.events_today = eventsData.data.reduce((sum, e) => sum + (e.totals || 0), 0);
+
+            // Get photos captured today
+            const photoEvent = eventsData.data.find(e => e.name === 'photo_captured');
+            amplitudeData.photos_today = photoEvent?.totals || 0;
+
+            // Format recent events from the events list
+            amplitudeData.recent_events = eventsData.data
+              .filter(e => e.totals > 0)
+              .sort((a, b) => (b.totals || 0) - (a.totals || 0))
+              .slice(0, 50)
+              .map(e => ({
+                name: e.name,
+                count: e.totals || 0,
+                timestamp: new Date().toISOString()
+              }));
+          }
+        }
+      } catch (ampError) {
+        console.error('Amplitude realtime error:', ampError.message);
+      }
+    }
+
+    // Get today's revenue from RevenueCat transactions
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const revenueResult = await pool.query(`
+        SELECT COALESCE(SUM(price), 0) as total
+        FROM transactions
+        WHERE created_at >= $1
+      `, [todayStart.toISOString()]);
+
+      amplitudeData.revenue_today = parseFloat(revenueResult.rows[0]?.total || 0);
+    } catch (e) {
+      // Revenue query failed, keep default 0
+    }
 
     res.json({
-      active_users: parseInt(activeUsers.rows[0].count),
-      recent_events: recentEvents.rows,
-      events_per_minute: eventsByMinute.rows
+      active_users: amplitudeData.active_users,
+      events_today: amplitudeData.events_today,
+      photos_today: amplitudeData.photos_today,
+      revenue_today: amplitudeData.revenue_today,
+      recent_events: amplitudeData.recent_events,
+      events_per_minute: amplitudeData.events_per_minute
     });
   } catch (error) {
     console.error('Error fetching realtime stats:', error);
