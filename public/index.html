@@ -2971,7 +2971,21 @@
                 document.getElementById('activeUsersRT').textContent = `${data.active_users} active users`;
                 document.getElementById('activeNow').textContent = data.active_users;
 
-                // Events per minute
+                // Update photos today and revenue today
+                if (data.photos_today !== undefined) {
+                    document.getElementById('photosToday').textContent = data.photos_today;
+                }
+                if (data.revenue_today !== undefined) {
+                    document.getElementById('revenueToday').textContent = `$${data.revenue_today.toFixed(2)}`;
+                }
+
+                // Events per minute - show events today if no per-minute data
+                if (data.events_today !== undefined && data.events_today > 0) {
+                    document.getElementById('eventsPerMin').textContent = data.events_today;
+                    // Update label to "Events Today" since we don't have per-minute data
+                }
+
+                // Events per minute chart
                 if (data.events_per_minute?.length > 0) {
                     const eventsPerMin = data.events_per_minute.reduce((sum, e) => sum + parseInt(e.count), 0) / data.events_per_minute.length;
                     document.getElementById('eventsPerMin').textContent = Math.round(eventsPerMin);
