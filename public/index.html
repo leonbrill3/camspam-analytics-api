@@ -2788,6 +2788,28 @@
                     document.getElementById('avgSession').textContent = `${mins}m`;
                 }
 
+                // Photos per user
+                if (data.photos_per_user !== undefined) {
+                    document.getElementById('photosPerUser').textContent = data.photos_per_user.toFixed(1);
+                }
+
+                // Sessions per user
+                if (data.sessions_per_user !== undefined) {
+                    document.getElementById('sessionsPerUser').textContent = data.sessions_per_user.toFixed(1);
+                }
+
+                // Screen views
+                if (data.screen_views !== undefined) {
+                    document.getElementById('screenViews').textContent = formatNumber(data.screen_views);
+                }
+
+                // Session duration distribution
+                if (data.session_duration_distribution?.length > 0) {
+                    charts.sessionDuration.data.labels = data.session_duration_distribution.map(d => d.bucket);
+                    charts.sessionDuration.data.datasets[0].data = data.session_duration_distribution.map(d => d.count);
+                    charts.sessionDuration.update();
+                }
+
                 // New users
                 if (data.new_users_by_day?.length > 0) {
                     const newUsersTotal = data.new_users_by_day.reduce((sum, d) => sum + parseInt(d.count), 0);
