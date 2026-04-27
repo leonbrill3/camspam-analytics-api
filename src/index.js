@@ -316,6 +316,34 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Public debug endpoint - check events count (no auth required)
+app.get('/debug/events-count', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as total_events,
+        COUNT(DISTINCT device_id) as unique_devices,
+        MIN(timestamp) as first_event,
+        MAX(timestamp) as last_event
+      FROM events
+    `);
+    const recentResult = await pool.query(`
+      SELECT name, COUNT(*) as count
+      FROM events
+      WHERE timestamp > NOW() - INTERVAL '1 hour'
+      GROUP BY name
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+    res.json({
+      ...result.rows[0],
+      recent_events_last_hour: recentResult.rows
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint - check Twilio configuration
 app.get('/debug/twilio', (req, res) => {
   res.json({
