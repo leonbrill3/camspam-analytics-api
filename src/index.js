@@ -4590,6 +4590,608 @@ app.get('/v1/stats/server-funnel', requireAuth, async (req, res) => {
   }
 });
 
+// ============================================
+// INTERACTIVE DRILL-DOWN ENDPOINTS
+// ============================================
+
+// GET /v1/server/users - List all users with device details
+app.get('/v1/server/users', requireAuth, async (req, res) => {
+  try {
+    const {
+      filter, // 'dau', 'wau', 'mau', 'new_today', 'returning', 'all'
+      event_name, // Filter by users who did a specific event
+      date_from,
+      date_to,
+      limit = 100,
+      offset = 0,
+      sort = 'last_seen', // 'last_seen', 'first_seen', 'events_count'
+      order = 'desc'
+    } = req.query;
+
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    let dateFilter = '';
+    const params = [];
+    let paramIndex = 1;
+
+    // Apply date filters based on filter type
+    if (filter === 'dau') {
+      params.push(today);
+      dateFilter = `AND e.timestamp >= $${paramIndex++}`;
+    } else if (filter === 'wau') {
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      params.push(weekAgo);
+      dateFilter = `AND e.timestamp >= $${paramIndex++}`;
+    } else if (filter === 'mau') {
+      const monthAgo = new Date(today);
+      monthAgo.setDate(monthAgo.getDate() - 30);
+      params.push(monthAgo);
+      dateFilter = `AND e.timestamp >= $${paramIndex++}`;
+    } else if (date_from && date_to) {
+      params.push(new Date(date_from), new Date(date_to));
+      dateFilter = `AND e.timestamp >= $${paramIndex++} AND e.timestamp <= $${paramIndex++}`;
+    } else if (date_from) {
+      params.push(new Date(date_from));
+      dateFilter = `AND e.timestamp >= $${paramIndex++}`;
+    }
+
+    // Event name filter
+    let eventFilter = '';
+    if (event_name) {
+      params.push(event_name);
+      eventFilter = `AND e.name = $${paramIndex++}`;
+    }
+
+    // Build main query
+    let query = `
+      WITH user_stats AS (
+        SELECT
+          e.device_id,
+          MIN(e.timestamp) as first_seen,
+          MAX(e.timestamp) as last_seen,
+          COUNT(*) as events_count,
+          COUNT(DISTINCT e.session_id) as sessions_count,
+          MAX(e.platform) as platform,
+          MAX(e.os_version) as os_version,
+          MAX(e.device_model) as device_model,
+          MAX(e.app_version) as app_version,
+          MAX(e.locale) as locale,
+          MAX(e.timezone) as timezone
+        FROM events e
+        WHERE 1=1 ${dateFilter} ${eventFilter}
+        GROUP BY e.device_id
+      )
+    `;
+
+    // Handle new_today and returning filters
+    if (filter === 'new_today') {
+      query += `
+        SELECT * FROM user_stats
+        WHERE DATE(first_seen) = CURRENT_DATE
+      `;
+    } else if (filter === 'returning') {
+      query += `
+        SELECT * FROM user_stats
+        WHERE DATE(first_seen) < CURRENT_DATE
+        AND DATE(last_seen) = CURRENT_DATE
+      `;
+    } else {
+      query += `SELECT * FROM user_stats`;
+    }
+
+    // Sorting
+    const sortColumn = sort === 'first_seen' ? 'first_seen' : sort === 'events_count' ? 'events_count' : 'last_seen';
+    const sortOrder = order === 'asc' ? 'ASC' : 'DESC';
+    query += ` ORDER BY ${sortColumn} ${sortOrder}`;
+
+    // Pagination
+    params.push(parseInt(limit), parseInt(offset));
+    query += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+
+    const result = await pool.query(query, params);
+
+    // Get total count
+    let countQuery = `
+      SELECT COUNT(DISTINCT device_id) as total
+      FROM events e
+      WHERE 1=1 ${dateFilter} ${eventFilter}
+    `;
+    if (filter === 'new_today') {
+      countQuery = `
+        SELECT COUNT(*) as total FROM (
+          SELECT device_id FROM events
+          WHERE 1=1 ${dateFilter} ${eventFilter}
+          GROUP BY device_id
+          HAVING MIN(timestamp)::date = CURRENT_DATE
+        ) t
+      `;
+    } else if (filter === 'returning') {
+      countQuery = `
+        SELECT COUNT(*) as total FROM (
+          SELECT device_id FROM events
+          WHERE 1=1 ${dateFilter} ${eventFilter}
+          GROUP BY device_id
+          HAVING MIN(timestamp)::date < CURRENT_DATE
+          AND MAX(timestamp)::date = CURRENT_DATE
+        ) t
+      `;
+    }
+    const countParams = params.slice(0, -2); // Remove limit/offset
+    const countResult = await pool.query(countQuery, countParams);
+
+    res.json({
+      users: result.rows.map(row => ({
+        device_id: row.device_id,
+        first_seen: row.first_seen,
+        last_seen: row.last_seen,
+        events_count: parseInt(row.events_count),
+        sessions_count: parseInt(row.sessions_count),
+        platform: row.platform,
+        os_version: row.os_version,
+        device_model: row.device_model,
+        app_version: row.app_version,
+        locale: row.locale,
+        timezone: row.timezone
+      })),
+      total: parseInt(countResult.rows[0].total),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('Error fetching server users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// GET /v1/server/users/:device_id - Get single user details
+app.get('/v1/server/users/:device_id', requireAuth, async (req, res) => {
+  try {
+    const { device_id } = req.params;
+
+    // User stats
+    const statsResult = await pool.query(`
+      SELECT
+        MIN(timestamp) as first_seen,
+        MAX(timestamp) as last_seen,
+        COUNT(*) as total_events,
+        COUNT(DISTINCT session_id) as total_sessions,
+        COUNT(DISTINCT DATE(timestamp)) as active_days,
+        MAX(platform) as platform,
+        MAX(os_version) as os_version,
+        MAX(device_model) as device_model,
+        MAX(app_version) as app_version,
+        MAX(locale) as locale,
+        MAX(timezone) as timezone
+      FROM events
+      WHERE device_id = $1
+    `, [device_id]);
+
+    // Event breakdown
+    const eventsBreakdown = await pool.query(`
+      SELECT name, COUNT(*) as count
+      FROM events
+      WHERE device_id = $1
+      GROUP BY name
+      ORDER BY count DESC
+    `, [device_id]);
+
+    // Recent events (last 50)
+    const recentEvents = await pool.query(`
+      SELECT id, name, category, properties, timestamp, session_id
+      FROM events
+      WHERE device_id = $1
+      ORDER BY timestamp DESC
+      LIMIT 50
+    `, [device_id]);
+
+    // Sessions timeline
+    const sessions = await pool.query(`
+      SELECT
+        session_id,
+        MIN(timestamp) as started,
+        MAX(timestamp) as ended,
+        COUNT(*) as events_count
+      FROM events
+      WHERE device_id = $1 AND session_id IS NOT NULL
+      GROUP BY session_id
+      ORDER BY started DESC
+      LIMIT 20
+    `, [device_id]);
+
+    if (statsResult.rows[0].first_seen === null) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      device_id,
+      ...statsResult.rows[0],
+      total_events: parseInt(statsResult.rows[0].total_events),
+      total_sessions: parseInt(statsResult.rows[0].total_sessions),
+      active_days: parseInt(statsResult.rows[0].active_days),
+      events_breakdown: eventsBreakdown.rows.map(r => ({
+        name: r.name,
+        count: parseInt(r.count)
+      })),
+      recent_events: recentEvents.rows,
+      sessions: sessions.rows.map(s => ({
+        session_id: s.session_id,
+        started: s.started,
+        ended: s.ended,
+        events_count: parseInt(s.events_count),
+        duration_ms: new Date(s.ended) - new Date(s.started)
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+// GET /v1/server/events - List events with filtering
+app.get('/v1/server/events', requireAuth, async (req, res) => {
+  try {
+    const {
+      name, // Event name filter
+      category, // Category filter
+      device_id, // User filter
+      date_from,
+      date_to,
+      date, // Single date filter (YYYY-MM-DD)
+      limit = 100,
+      offset = 0
+    } = req.query;
+
+    const params = [];
+    let paramIndex = 1;
+    let whereClause = 'WHERE 1=1';
+
+    if (name) {
+      params.push(name);
+      whereClause += ` AND name = $${paramIndex++}`;
+    }
+    if (category) {
+      params.push(category);
+      whereClause += ` AND category = $${paramIndex++}`;
+    }
+    if (device_id) {
+      params.push(device_id);
+      whereClause += ` AND device_id = $${paramIndex++}`;
+    }
+    if (date) {
+      params.push(date);
+      whereClause += ` AND DATE(timestamp) = $${paramIndex++}`;
+    } else {
+      if (date_from) {
+        params.push(new Date(date_from));
+        whereClause += ` AND timestamp >= $${paramIndex++}`;
+      }
+      if (date_to) {
+        params.push(new Date(date_to));
+        whereClause += ` AND timestamp <= $${paramIndex++}`;
+      }
+    }
+
+    // Get events
+    params.push(parseInt(limit), parseInt(offset));
+    const query = `
+      SELECT id, name, category, properties, timestamp, device_id, session_id,
+             platform, os_version, device_model, app_version, locale
+      FROM events
+      ${whereClause}
+      ORDER BY timestamp DESC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+    const result = await pool.query(query, params);
+
+    // Get count
+    const countParams = params.slice(0, -2);
+    const countResult = await pool.query(`SELECT COUNT(*) as total FROM events ${whereClause}`, countParams);
+
+    res.json({
+      events: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+  } catch (error) {
+    console.error('Error fetching events:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
+// GET /v1/server/events/by-date - Events grouped by date
+app.get('/v1/server/events/by-date', requireAuth, async (req, res) => {
+  try {
+    const { days = 30, name } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    let nameFilter = '';
+    const params = [startDate];
+    if (name) {
+      params.push(name);
+      nameFilter = `AND name = $2`;
+    }
+
+    const result = await pool.query(`
+      SELECT
+        DATE(timestamp) as date,
+        COUNT(*) as events,
+        COUNT(DISTINCT device_id) as users
+      FROM events
+      WHERE timestamp >= $1 ${nameFilter}
+      GROUP BY DATE(timestamp)
+      ORDER BY date DESC
+    `, params);
+
+    res.json({
+      dates: result.rows.map(r => ({
+        date: r.date,
+        events: parseInt(r.events),
+        users: parseInt(r.users)
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching events by date:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
+// GET /v1/server/events/types - List all event types with counts
+app.get('/v1/server/events/types', requireAuth, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const result = await pool.query(`
+      SELECT
+        name,
+        category,
+        COUNT(*) as count,
+        COUNT(DISTINCT device_id) as unique_users,
+        MIN(timestamp) as first_occurrence,
+        MAX(timestamp) as last_occurrence
+      FROM events
+      WHERE timestamp >= $1
+      GROUP BY name, category
+      ORDER BY count DESC
+    `, [startDate]);
+
+    res.json({
+      event_types: result.rows.map(r => ({
+        name: r.name,
+        category: r.category,
+        count: parseInt(r.count),
+        unique_users: parseInt(r.unique_users),
+        first_occurrence: r.first_occurrence,
+        last_occurrence: r.last_occurrence
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching event types:', error);
+    res.status(500).json({ error: 'Failed to fetch event types' });
+  }
+});
+
+// GET /v1/server/retention/cohort/:date - Get users in a specific cohort
+app.get('/v1/server/retention/cohort/:date', requireAuth, async (req, res) => {
+  try {
+    const { date } = req.params;
+    const { return_day } = req.query; // 1, 7, 14, 30
+
+    // Users who first appeared on this date
+    let query = `
+      SELECT device_id, MIN(timestamp) as first_seen
+      FROM events
+      GROUP BY device_id
+      HAVING DATE(MIN(timestamp)) = $1
+    `;
+
+    if (return_day) {
+      const returnDate = new Date(date);
+      returnDate.setDate(returnDate.getDate() + parseInt(return_day));
+
+      query = `
+        WITH cohort AS (
+          SELECT device_id
+          FROM events
+          GROUP BY device_id
+          HAVING DATE(MIN(timestamp)) = $1
+        ),
+        returned AS (
+          SELECT DISTINCT e.device_id
+          FROM events e
+          JOIN cohort c ON e.device_id = c.device_id
+          WHERE DATE(e.timestamp) = $2
+        )
+        SELECT c.device_id,
+               CASE WHEN r.device_id IS NOT NULL THEN true ELSE false END as returned
+        FROM cohort c
+        LEFT JOIN returned r ON c.device_id = r.device_id
+      `;
+
+      const result = await pool.query(query, [date, returnDate.toISOString().split('T')[0]]);
+      return res.json({
+        cohort_date: date,
+        return_day: parseInt(return_day),
+        users: result.rows
+      });
+    }
+
+    const result = await pool.query(query, [date]);
+    res.json({
+      cohort_date: date,
+      users: result.rows
+    });
+  } catch (error) {
+    console.error('Error fetching cohort:', error);
+    res.status(500).json({ error: 'Failed to fetch cohort' });
+  }
+});
+
+// GET /v1/server/funnel/step/:step_name - Get users at a funnel step
+app.get('/v1/server/funnel/step/:step_name', requireAuth, async (req, res) => {
+  try {
+    const { step_name } = req.params;
+    const { days = 30, include_dropped = false } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    // Map step names to event names
+    const stepToEvent = {
+      'app_opened': 'app_opened',
+      'permission_granted': 'permission_result',
+      'first_photo': 'photo_captured',
+      'first_scan': 'scan_started',
+      'paywall_viewed': 'paywall_viewed',
+      'subscription_started': 'subscription_started'
+    };
+
+    const eventName = stepToEvent[step_name] || step_name;
+
+    const result = await pool.query(`
+      SELECT DISTINCT device_id
+      FROM events
+      WHERE name = $1 AND timestamp >= $2
+    `, [eventName, startDate]);
+
+    res.json({
+      step: step_name,
+      event_name: eventName,
+      users: result.rows.map(r => r.device_id),
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching funnel step:', error);
+    res.status(500).json({ error: 'Failed to fetch funnel step' });
+  }
+});
+
+// GET /v1/server/funnel/dropoff/:from_step/:to_step - Get users who dropped off
+app.get('/v1/server/funnel/dropoff/:from_step/:to_step', requireAuth, async (req, res) => {
+  try {
+    const { from_step, to_step } = req.params;
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const stepToEvent = {
+      'app_opened': 'app_opened',
+      'permission_granted': 'permission_result',
+      'first_photo': 'photo_captured',
+      'first_scan': 'scan_started',
+      'paywall_viewed': 'paywall_viewed',
+      'subscription_started': 'subscription_started'
+    };
+
+    const fromEvent = stepToEvent[from_step] || from_step;
+    const toEvent = stepToEvent[to_step] || to_step;
+
+    // Users who did from_step but NOT to_step
+    const result = await pool.query(`
+      SELECT DISTINCT e1.device_id
+      FROM events e1
+      WHERE e1.name = $1 AND e1.timestamp >= $3
+      AND NOT EXISTS (
+        SELECT 1 FROM events e2
+        WHERE e2.device_id = e1.device_id
+        AND e2.name = $2
+        AND e2.timestamp >= $3
+      )
+    `, [fromEvent, toEvent, startDate]);
+
+    res.json({
+      from_step,
+      to_step,
+      dropped_users: result.rows.map(r => r.device_id),
+      count: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching funnel dropoff:', error);
+    res.status(500).json({ error: 'Failed to fetch funnel dropoff' });
+  }
+});
+
+// GET /v1/server/photos/by-source/:source - Get photos by source (app/widget)
+app.get('/v1/server/photos/by-source/:source', requireAuth, async (req, res) => {
+  try {
+    const { source } = req.params;
+    const { days = 30, limit = 100, offset = 0 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const result = await pool.query(`
+      SELECT device_id, timestamp, properties
+      FROM events
+      WHERE name = 'photo_captured'
+      AND COALESCE(properties->>'source', 'app') = $1
+      AND timestamp >= $2
+      ORDER BY timestamp DESC
+      LIMIT $3 OFFSET $4
+    `, [source, startDate, parseInt(limit), parseInt(offset)]);
+
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as total, COUNT(DISTINCT device_id) as unique_users
+      FROM events
+      WHERE name = 'photo_captured'
+      AND COALESCE(properties->>'source', 'app') = $1
+      AND timestamp >= $2
+    `, [source, startDate]);
+
+    res.json({
+      source,
+      photos: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      unique_users: parseInt(countResult.rows[0].unique_users)
+    });
+  } catch (error) {
+    console.error('Error fetching photos by source:', error);
+    res.status(500).json({ error: 'Failed to fetch photos' });
+  }
+});
+
+// GET /v1/server/scans/by-range/:range - Get scans by date range setting
+app.get('/v1/server/scans/by-range/:range', requireAuth, async (req, res) => {
+  try {
+    const { range } = req.params;
+    const { days = 30, limit = 100, offset = 0 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+
+    const result = await pool.query(`
+      SELECT device_id, timestamp, properties
+      FROM events
+      WHERE name = 'scan_started'
+      AND properties->>'date_range' = $1
+      AND timestamp >= $2
+      ORDER BY timestamp DESC
+      LIMIT $3 OFFSET $4
+    `, [range, startDate, parseInt(limit), parseInt(offset)]);
+
+    const countResult = await pool.query(`
+      SELECT COUNT(*) as total, COUNT(DISTINCT device_id) as unique_users
+      FROM events
+      WHERE name = 'scan_started'
+      AND properties->>'date_range' = $1
+      AND timestamp >= $2
+    `, [range, startDate]);
+
+    res.json({
+      date_range: range,
+      scans: result.rows,
+      total: parseInt(countResult.rows[0].total),
+      unique_users: parseInt(countResult.rows[0].unique_users)
+    });
+  } catch (error) {
+    console.error('Error fetching scans by range:', error);
+    res.status(500).json({ error: 'Failed to fetch scans' });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Analytics API running on port ${PORT}`);
