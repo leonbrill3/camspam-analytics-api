@@ -1132,6 +1132,10 @@
                     <span class="nav-item-icon">👤</span>
                     <span>Users</span>
                 </div>
+                <div class="nav-item" data-page="server-analytics">
+                    <span class="nav-item-icon">🖥️</span>
+                    <span>Server Analytics</span>
+                </div>
 
                 <div class="nav-section">
                     <div class="nav-section-title">Integrations</div>
@@ -2022,6 +2026,258 @@
                 </div>
             </section>
 
+            <!-- ==================== SERVER ANALYTICS PAGE ==================== -->
+            <section class="page-section" id="page-server-analytics">
+                <header class="page-header">
+                    <div>
+                        <h1 class="page-title">Server Analytics</h1>
+                        <p class="page-subtitle">100% server-side tracking - independent of ATT/Apple opt-in</p>
+                    </div>
+                    <div class="header-badge" style="background: linear-gradient(135deg, #10b981, #059669); padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+                        🖥️ Your Own Data
+                    </div>
+                </header>
+
+                <!-- Overview Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">👥 Total Users (All Time)</div>
+                        <div class="stat-value" id="serverTotalUsers">-</div>
+                        <div class="stat-change neutral">Unique devices tracked</div>
+                    </div>
+                    <div class="stat-card highlight">
+                        <div class="stat-label">📈 DAU</div>
+                        <div class="stat-value" id="serverDAU">-</div>
+                        <div class="stat-change neutral">Daily active users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📊 WAU</div>
+                        <div class="stat-value" id="serverWAU">-</div>
+                        <div class="stat-change neutral">Weekly active users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📆 MAU</div>
+                        <div class="stat-value" id="serverMAU">-</div>
+                        <div class="stat-change neutral">Monthly active users</div>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="margin-top: 16px;">
+                    <div class="stat-card">
+                        <div class="stat-label">📨 Events Today</div>
+                        <div class="stat-value" id="serverEventsToday">-</div>
+                        <div class="stat-change neutral">Total events logged</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📊 Events/User</div>
+                        <div class="stat-value" id="serverEventsPerUser">-</div>
+                        <div class="stat-change neutral">Avg events per user</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🆕 New Users Today</div>
+                        <div class="stat-value" id="serverNewUsersToday">-</div>
+                        <div class="stat-change neutral">First seen today</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🔄 Returning Users</div>
+                        <div class="stat-value" id="serverReturningUsers">-</div>
+                        <div class="stat-change neutral">Seen before today</div>
+                    </div>
+                </div>
+
+                <!-- Photo Analytics -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h2 style="font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        📸 Photo Analytics
+                    </h2>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">📷 Total Photos Captured</div>
+                        <div class="stat-value" id="serverTotalPhotos">-</div>
+                        <div class="stat-change neutral">All time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">👤 Photos/User</div>
+                        <div class="stat-value" id="serverPhotosPerUser">-</div>
+                        <div class="stat-change neutral">Average per user</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📱 From App</div>
+                        <div class="stat-value" id="serverPhotosApp">-</div>
+                        <div class="stat-change neutral">Via main app</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🔲 From Widget</div>
+                        <div class="stat-value" id="serverPhotosWidget">-</div>
+                        <div class="stat-change neutral">Via widget</div>
+                    </div>
+                </div>
+
+                <div class="info-row" style="margin-top: 16px;">
+                    <div class="chart-card" style="flex: 1;">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Capture Source</div>
+                                <div class="chart-subtitle">App vs Widget breakdown</div>
+                            </div>
+                        </div>
+                        <div id="serverCaptureSourceChart" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                            <div class="empty-state-text">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="chart-card" style="flex: 1;">
+                        <div class="chart-header">
+                            <div>
+                                <div class="chart-title">Delete Schedule</div>
+                                <div class="chart-subtitle">Auto-delete timing preferences</div>
+                            </div>
+                        </div>
+                        <div id="serverDeleteScheduleChart" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                            <div class="empty-state-text">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Scan Analytics -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h2 style="font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        🔍 Scan Analytics
+                    </h2>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">🔎 Total Scans</div>
+                        <div class="stat-value" id="serverTotalScans">-</div>
+                        <div class="stat-change neutral">All time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">👤 Scans/User</div>
+                        <div class="stat-value" id="serverScansPerUser">-</div>
+                        <div class="stat-change neutral">Average per user</div>
+                    </div>
+                    <div class="stat-card highlight">
+                        <div class="stat-label">✅ Success Rate</div>
+                        <div class="stat-value" id="serverScanSuccessRate">-</div>
+                        <div class="stat-change neutral">Completed / Started</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">⏱️ Avg Duration</div>
+                        <div class="stat-value" id="serverAvgScanDuration">-</div>
+                        <div class="stat-change neutral">Seconds per scan</div>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="margin-top: 16px;">
+                    <div class="stat-card">
+                        <div class="stat-label">📷 Photos Scanned</div>
+                        <div class="stat-value" id="serverPhotosScanned">-</div>
+                        <div class="stat-change neutral">Total photos analyzed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📊 Photos/Scan</div>
+                        <div class="stat-value" id="serverPhotosPerScan">-</div>
+                        <div class="stat-change neutral">Avg photos per scan</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🗑️ Spam Detected</div>
+                        <div class="stat-value" id="serverSpamDetected">-</div>
+                        <div class="stat-change neutral">Photos marked as spam</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📈 Spam Rate</div>
+                        <div class="stat-value" id="serverSpamRate">-</div>
+                        <div class="stat-change neutral">% of photos flagged</div>
+                    </div>
+                </div>
+
+                <div class="chart-card" style="margin-top: 16px;">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Date Range Preferences</div>
+                            <div class="chart-subtitle">How far back users scan</div>
+                        </div>
+                    </div>
+                    <div id="serverDateRangeChart" style="padding: 16px;">
+                        <div class="empty-state-text">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- Session Analytics -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h2 style="font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        📱 Session Analytics
+                    </h2>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">🔄 Total Sessions</div>
+                        <div class="stat-value" id="serverTotalSessions">-</div>
+                        <div class="stat-change neutral">All time</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">👤 Sessions/User</div>
+                        <div class="stat-value" id="serverSessionsPerUser">-</div>
+                        <div class="stat-change neutral">Average per user</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">🖼️ Gallery Views</div>
+                        <div class="stat-value" id="serverGalleryViews">-</div>
+                        <div class="stat-change neutral">Total views</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">📊 Gallery/Session</div>
+                        <div class="stat-value" id="serverGalleryPerSession">-</div>
+                        <div class="stat-change neutral">Views per session</div>
+                    </div>
+                </div>
+
+                <!-- Retention Chart -->
+                <div class="chart-card" style="margin-top: 24px;">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Retention Cohorts</div>
+                            <div class="chart-subtitle">User return rates by day</div>
+                        </div>
+                    </div>
+                    <div id="serverRetentionChart" style="padding: 16px; overflow-x: auto;">
+                        <div class="empty-state-text">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- Conversion Funnel -->
+                <div class="chart-card" style="margin-top: 24px;">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Conversion Funnel</div>
+                            <div class="chart-subtitle">User journey from open to subscription</div>
+                        </div>
+                    </div>
+                    <div id="serverFunnelChart" style="padding: 16px;">
+                        <div class="empty-state-text">Loading...</div>
+                    </div>
+                </div>
+
+                <!-- Recent Events -->
+                <div class="chart-card" style="margin-top: 24px;">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Recent Server Events</div>
+                            <div class="chart-subtitle">Live feed of server-tracked events</div>
+                        </div>
+                    </div>
+                    <div class="realtime-feed" id="serverEventsFeed" style="max-height: 400px;">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📡</div>
+                            <div class="empty-state-text">Loading server events...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- ==================== REVENUECAT PAGE ==================== -->
             <section class="page-section" id="page-revenuecat">
                 <header class="page-header">
@@ -2440,6 +2696,9 @@
                             document.getElementById('users-detail-view').style.display = 'none';
                             currentUserOffset = 0;
                             fetchUsersList();
+                        }
+                        if (page === 'server-analytics') {
+                            fetchServerAnalytics();
                         }
                     }
                 });
@@ -3550,6 +3809,410 @@
             } catch (e) {
                 console.error('Error fetching feature usage data:', e);
             }
+        }
+
+        // ============================================
+        // SERVER ANALYTICS FUNCTIONS
+        // ============================================
+
+        async function fetchServerAnalytics() {
+            // Fetch all server analytics data in parallel
+            await Promise.all([
+                fetchServerOverview(),
+                fetchServerPhotos(),
+                fetchServerScans(),
+                fetchServerSessions(),
+                fetchServerRetention(),
+                fetchServerFunnel(),
+                fetchServerRecentEvents()
+            ]);
+        }
+
+        async function fetchServerOverview() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/server-overview`);
+                const data = await res.json();
+
+                // Total users
+                if (data.total_users !== undefined) {
+                    document.getElementById('serverTotalUsers').textContent = formatNumber(data.total_users);
+                }
+
+                // DAU/WAU/MAU
+                if (data.dau !== undefined) {
+                    document.getElementById('serverDAU').textContent = formatNumber(data.dau);
+                }
+                if (data.wau !== undefined) {
+                    document.getElementById('serverWAU').textContent = formatNumber(data.wau);
+                }
+                if (data.mau !== undefined) {
+                    document.getElementById('serverMAU').textContent = formatNumber(data.mau);
+                }
+
+                // Events today
+                if (data.events_today !== undefined) {
+                    document.getElementById('serverEventsToday').textContent = formatNumber(data.events_today);
+                }
+
+                // Events per user
+                if (data.events_per_user !== undefined) {
+                    document.getElementById('serverEventsPerUser').textContent = data.events_per_user.toFixed(1);
+                }
+
+                // New users today
+                if (data.new_users_today !== undefined) {
+                    document.getElementById('serverNewUsersToday').textContent = formatNumber(data.new_users_today);
+                }
+
+                // Returning users
+                if (data.returning_users !== undefined) {
+                    document.getElementById('serverReturningUsers').textContent = formatNumber(data.returning_users);
+                }
+
+            } catch (e) {
+                console.error('Error fetching server overview:', e);
+            }
+        }
+
+        async function fetchServerPhotos() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/server-photos`);
+                const data = await res.json();
+
+                // Total photos
+                if (data.total_photos !== undefined) {
+                    document.getElementById('serverTotalPhotos').textContent = formatNumber(data.total_photos);
+                }
+
+                // Photos per user
+                if (data.photos_per_user !== undefined) {
+                    document.getElementById('serverPhotosPerUser').textContent = data.photos_per_user.toFixed(1);
+                }
+
+                // From app
+                if (data.from_app !== undefined) {
+                    document.getElementById('serverPhotosApp').textContent = formatNumber(data.from_app);
+                }
+
+                // From widget
+                if (data.from_widget !== undefined) {
+                    document.getElementById('serverPhotosWidget').textContent = formatNumber(data.from_widget);
+                }
+
+                // Capture source chart
+                const sourceChart = document.getElementById('serverCaptureSourceChart');
+                if (data.from_app !== undefined && data.from_widget !== undefined) {
+                    const total = (data.from_app || 0) + (data.from_widget || 0);
+                    if (total > 0) {
+                        const appPct = ((data.from_app || 0) / total * 100).toFixed(1);
+                        const widgetPct = ((data.from_widget || 0) / total * 100).toFixed(1);
+                        sourceChart.innerHTML = `
+                            <div style="display: flex; gap: 24px; justify-content: center; align-items: center;">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 32px; font-weight: 700; color: var(--primary);">${appPct}%</div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">📱 App</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 32px; font-weight: 700; color: var(--accent);">${widgetPct}%</div>
+                                    <div style="font-size: 13px; color: var(--text-secondary);">🔲 Widget</div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        sourceChart.innerHTML = '<div class="empty-state-text">No photo data yet</div>';
+                    }
+                }
+
+                // Delete schedule chart
+                const scheduleChart = document.getElementById('serverDeleteScheduleChart');
+                if (data.delete_schedule) {
+                    const schedules = data.delete_schedule;
+                    const total = Object.values(schedules).reduce((a, b) => a + b, 0);
+                    if (total > 0) {
+                        scheduleChart.innerHTML = `
+                            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                                ${Object.entries(schedules).map(([key, val]) => {
+                                    const pct = (val / total * 100).toFixed(0);
+                                    return `
+                                        <div style="display: flex; align-items: center; gap: 12px;">
+                                            <div style="width: 60px; font-size: 12px; color: var(--text-secondary);">${key}</div>
+                                            <div style="flex: 1; height: 20px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                                <div style="width: ${pct}%; height: 100%; background: var(--primary);"></div>
+                                            </div>
+                                            <div style="width: 40px; font-size: 12px; text-align: right;">${pct}%</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `;
+                    } else {
+                        scheduleChart.innerHTML = '<div class="empty-state-text">No schedule data yet</div>';
+                    }
+                }
+
+            } catch (e) {
+                console.error('Error fetching server photos:', e);
+            }
+        }
+
+        async function fetchServerScans() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/server-scans`);
+                const data = await res.json();
+
+                // Total scans
+                if (data.total_scans !== undefined) {
+                    document.getElementById('serverTotalScans').textContent = formatNumber(data.total_scans);
+                }
+
+                // Scans per user
+                if (data.scans_per_user !== undefined) {
+                    document.getElementById('serverScansPerUser').textContent = data.scans_per_user.toFixed(1);
+                }
+
+                // Success rate
+                if (data.success_rate !== undefined) {
+                    document.getElementById('serverScanSuccessRate').textContent = data.success_rate.toFixed(0) + '%';
+                }
+
+                // Avg duration
+                if (data.avg_duration_ms !== undefined) {
+                    const seconds = (data.avg_duration_ms / 1000).toFixed(1);
+                    document.getElementById('serverAvgScanDuration').textContent = seconds + 's';
+                }
+
+                // Photos scanned
+                if (data.photos_scanned !== undefined) {
+                    document.getElementById('serverPhotosScanned').textContent = formatNumber(data.photos_scanned);
+                }
+
+                // Photos per scan
+                if (data.photos_per_scan !== undefined) {
+                    document.getElementById('serverPhotosPerScan').textContent = data.photos_per_scan.toFixed(0);
+                }
+
+                // Spam detected
+                if (data.spam_detected !== undefined) {
+                    document.getElementById('serverSpamDetected').textContent = formatNumber(data.spam_detected);
+                }
+
+                // Spam rate
+                if (data.spam_rate !== undefined) {
+                    document.getElementById('serverSpamRate').textContent = data.spam_rate.toFixed(1) + '%';
+                }
+
+                // Date range chart
+                const rangeChart = document.getElementById('serverDateRangeChart');
+                if (data.date_ranges) {
+                    const ranges = data.date_ranges;
+                    const total = Object.values(ranges).reduce((a, b) => a + b, 0);
+                    if (total > 0) {
+                        const labels = {
+                            '7_days': '7 Days',
+                            '30_days': '30 Days',
+                            '6_months': '6 Months',
+                            'all_time': 'All Time',
+                            'custom': 'Custom'
+                        };
+                        rangeChart.innerHTML = `
+                            <div style="display: flex; justify-content: space-around; text-align: center;">
+                                ${Object.entries(ranges).map(([key, val]) => {
+                                    const pct = (val / total * 100).toFixed(0);
+                                    return `
+                                        <div>
+                                            <div style="font-size: 24px; font-weight: 700; color: var(--primary);">${pct}%</div>
+                                            <div style="font-size: 12px; color: var(--text-secondary);">${labels[key] || key}</div>
+                                            <div style="font-size: 11px; color: var(--text-muted);">(${formatNumber(val)})</div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        `;
+                    } else {
+                        rangeChart.innerHTML = '<div class="empty-state-text">No scan data yet</div>';
+                    }
+                }
+
+            } catch (e) {
+                console.error('Error fetching server scans:', e);
+            }
+        }
+
+        async function fetchServerSessions() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/server-sessions`);
+                const data = await res.json();
+
+                // Total sessions
+                if (data.total_sessions !== undefined) {
+                    document.getElementById('serverTotalSessions').textContent = formatNumber(data.total_sessions);
+                }
+
+                // Sessions per user
+                if (data.sessions_per_user !== undefined) {
+                    document.getElementById('serverSessionsPerUser').textContent = data.sessions_per_user.toFixed(1);
+                }
+
+                // Gallery views
+                if (data.gallery_views !== undefined) {
+                    document.getElementById('serverGalleryViews').textContent = formatNumber(data.gallery_views);
+                }
+
+                // Gallery per session
+                if (data.gallery_per_session !== undefined) {
+                    document.getElementById('serverGalleryPerSession').textContent = data.gallery_per_session.toFixed(1);
+                }
+
+            } catch (e) {
+                console.error('Error fetching server sessions:', e);
+            }
+        }
+
+        async function fetchServerRetention() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/server-retention`);
+                const data = await res.json();
+
+                const chart = document.getElementById('serverRetentionChart');
+
+                if (data.cohorts && data.cohorts.length > 0) {
+                    chart.innerHTML = `
+                        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                                    <th style="padding: 8px; text-align: left;">Cohort</th>
+                                    <th style="padding: 8px; text-align: center;">Users</th>
+                                    <th style="padding: 8px; text-align: center;">Day 1</th>
+                                    <th style="padding: 8px; text-align: center;">Day 7</th>
+                                    <th style="padding: 8px; text-align: center;">Day 14</th>
+                                    <th style="padding: 8px; text-align: center;">Day 30</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.cohorts.map(cohort => `
+                                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                        <td style="padding: 8px;">${cohort.date}</td>
+                                        <td style="padding: 8px; text-align: center;">${cohort.users}</td>
+                                        <td style="padding: 8px; text-align: center;">
+                                            <span class="retention-badge ${getRetentionClass(cohort.day1)}">${cohort.day1?.toFixed(0) || '-'}%</span>
+                                        </td>
+                                        <td style="padding: 8px; text-align: center;">
+                                            <span class="retention-badge ${getRetentionClass(cohort.day7)}">${cohort.day7?.toFixed(0) || '-'}%</span>
+                                        </td>
+                                        <td style="padding: 8px; text-align: center;">
+                                            <span class="retention-badge ${getRetentionClass(cohort.day14)}">${cohort.day14?.toFixed(0) || '-'}%</span>
+                                        </td>
+                                        <td style="padding: 8px; text-align: center;">
+                                            <span class="retention-badge ${getRetentionClass(cohort.day30)}">${cohort.day30?.toFixed(0) || '-'}%</span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                } else {
+                    chart.innerHTML = '<div class="empty-state-text">No retention data yet - need at least 1 day of data</div>';
+                }
+
+            } catch (e) {
+                console.error('Error fetching server retention:', e);
+            }
+        }
+
+        async function fetchServerFunnel() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/stats/server-funnel`);
+                const data = await res.json();
+
+                const chart = document.getElementById('serverFunnelChart');
+
+                if (data.steps && data.steps.length > 0) {
+                    const maxUsers = data.steps[0]?.users || 1;
+
+                    chart.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            ${data.steps.map((step, i) => {
+                                const pct = (step.users / maxUsers * 100).toFixed(0);
+                                const convRate = i > 0 && data.steps[i-1].users > 0
+                                    ? (step.users / data.steps[i-1].users * 100).toFixed(0)
+                                    : '100';
+                                return `
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <div style="width: 140px; font-size: 13px;">${step.name}</div>
+                                        <div style="flex: 1; height: 32px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; position: relative;">
+                                            <div style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.5s;"></div>
+                                            <div style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 600;">
+                                                ${formatNumber(step.users)}
+                                            </div>
+                                        </div>
+                                        <div style="width: 60px; text-align: right; font-size: 12px; color: ${i === 0 ? 'var(--text-secondary)' : convRate >= 50 ? 'var(--success)' : convRate >= 25 ? 'var(--warning)' : 'var(--danger)'};">
+                                            ${i === 0 ? '100%' : convRate + '%'}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } else {
+                    chart.innerHTML = '<div class="empty-state-text">No funnel data yet</div>';
+                }
+
+            } catch (e) {
+                console.error('Error fetching server funnel:', e);
+            }
+        }
+
+        async function fetchServerRecentEvents() {
+            try {
+                const res = await fetch(`${API_BASE}/v1/events/recent?limit=50`);
+                const data = await res.json();
+
+                const feed = document.getElementById('serverEventsFeed');
+
+                if (data.events && data.events.length > 0) {
+                    feed.innerHTML = data.events.map(event => `
+                        <div class="realtime-event ${getEventIconClass(event.name)}">
+                            <div class="event-icon">${getEventIcon(event.name)}</div>
+                            <div class="event-content">
+                                <div class="event-title">${formatEventName(event.name)}</div>
+                                <div class="event-details">
+                                    ${event.device_id ? event.device_id.slice(0, 8) + '...' : 'Unknown'}
+                                    • ${event.platform || 'iOS'}
+                                    • ${event.app_version || '?'}
+                                </div>
+                            </div>
+                            <div class="event-time">${formatRelativeTime(event.timestamp || event.created_at)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    feed.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📡</div>
+                            <div class="empty-state-text">No events yet - waiting for app data</div>
+                        </div>
+                    `;
+                }
+
+            } catch (e) {
+                console.error('Error fetching server events:', e);
+            }
+        }
+
+        function formatRelativeTime(dateStr) {
+            if (!dateStr) return 'Just now';
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffSecs = Math.floor(diffMs / 1000);
+            const diffMins = Math.floor(diffSecs / 60);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffSecs < 60) return 'Just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            if (diffDays < 7) return `${diffDays}d ago`;
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         }
 
         // Utility functions

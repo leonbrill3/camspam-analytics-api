@@ -965,6 +965,28 @@ app.post('/v1/events', async (req, res) => {
   }
 });
 
+// GET /v1/events/recent - Get recent events for dashboard feed
+app.get('/v1/events/recent', requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+
+    const result = await pool.query(`
+      SELECT
+        name, category, properties, timestamp, created_at,
+        device_id, session_id, platform, os_version,
+        device_model, app_version, locale, timezone
+      FROM events
+      ORDER BY COALESCE(timestamp, created_at) DESC
+      LIMIT $1
+    `, [limit]);
+
+    res.json({ events: result.rows });
+  } catch (error) {
+    console.error('Error fetching recent events:', error);
+    res.status(500).json({ error: 'Failed to fetch events' });
+  }
+});
+
 // ============================================
 // DASHBOARD API
 // ============================================
@@ -4018,6 +4040,553 @@ app.get('/v1/stats/feature-usage', async (req, res) => {
   } catch (error) {
     console.error('Error fetching feature usage:', error);
     res.status(500).json({ error: 'Failed to fetch feature usage' });
+  }
+});
+
+// ============================================
+// SERVER ANALYTICS ENDPOINTS
+// (100% server-side tracking - no ATT dependency)
+// ============================================
+
+// GET /v1/stats/server-overview - DAU/WAU/MAU, total users, events from server events table
+app.get('/v1/stats/server-overview', requireAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    const monthAgo = new Date(today);
+    monthAgo.setDate(monthAgo.getDate() - 30);
+
+    // Run all queries in parallel
+    const [
+      dauResult,
+      dauYesterdayResult,
+      wauResult,
+      mauResult,
+      totalUsersResult,
+      totalEventsResult,
+      eventsToday,
+      newUsersToday,
+      avgEventsPerUser
+    ] = await Promise.all([
+      // DAU (today)
+      pool.query(`
+        SELECT COUNT(DISTINCT device_id) as count
+        FROM events
+        WHERE timestamp >= $1
+      `, [today]),
+
+      // DAU (yesterday for comparison)
+      pool.query(`
+        SELECT COUNT(DISTINCT device_id) as count
+        FROM events
+        WHERE timestamp >= $1 AND timestamp < $2
+      `, [yesterday, today]),
+
+      // WAU
+      pool.query(`
+        SELECT COUNT(DISTINCT device_id) as count
+        FROM events
+        WHERE timestamp >= $1
+      `, [weekAgo]),
+
+      // MAU
+      pool.query(`
+        SELECT COUNT(DISTINCT device_id) as count
+        FROM events
+        WHERE timestamp >= $1
+      `, [monthAgo]),
+
+      // Total unique users all time
+      pool.query(`SELECT COUNT(DISTINCT device_id) as count FROM events`),
+
+      // Total events all time
+      pool.query(`SELECT COUNT(*) as count FROM events`),
+
+      // Events today
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE timestamp >= $1
+      `, [today]),
+
+      // New users today (first event was today)
+      pool.query(`
+        SELECT COUNT(*) as count FROM (
+          SELECT device_id
+          FROM events
+          GROUP BY device_id
+          HAVING MIN(timestamp) >= $1
+        ) first_events
+      `, [today]),
+
+      // Avg events per user (last 30 days)
+      pool.query(`
+        SELECT
+          COALESCE(COUNT(*)::float / NULLIF(COUNT(DISTINCT device_id), 0), 0) as avg
+        FROM events
+        WHERE timestamp >= $1
+      `, [monthAgo])
+    ]);
+
+    const dau = parseInt(dauResult.rows[0].count);
+    const dauYesterday = parseInt(dauYesterdayResult.rows[0].count);
+
+    res.json({
+      dau,
+      dau_change: dauYesterday > 0 ? ((dau - dauYesterday) / dauYesterday * 100).toFixed(1) : 0,
+      wau: parseInt(wauResult.rows[0].count),
+      mau: parseInt(mauResult.rows[0].count),
+      total_users: parseInt(totalUsersResult.rows[0].count),
+      total_events: parseInt(totalEventsResult.rows[0].count),
+      events_today: parseInt(eventsToday.rows[0].count),
+      new_users_today: parseInt(newUsersToday.rows[0].count),
+      avg_events_per_user: parseFloat(avgEventsPerUser.rows[0].avg).toFixed(1),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching server overview:', error);
+    res.status(500).json({ error: 'Failed to fetch server overview' });
+  }
+});
+
+// GET /v1/stats/server-photos - Photo capture analytics from server events
+app.get('/v1/stats/server-photos', requireAuth, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    const [
+      totalPhotos,
+      photosPerUser,
+      sourceBreakdown,
+      scheduleBreakdown,
+      photosByDay
+    ] = await Promise.all([
+      // Total photos captured
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      // Photos per user (avg)
+      pool.query(`
+        SELECT
+          COALESCE(COUNT(*)::float / NULLIF(COUNT(DISTINCT device_id), 0), 0) as avg
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      // Source breakdown (app vs widget)
+      pool.query(`
+        SELECT
+          COALESCE(properties->>'source', 'app') as source,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+        GROUP BY COALESCE(properties->>'source', 'app')
+      `, [startDate]),
+
+      // Delete schedule breakdown
+      pool.query(`
+        SELECT
+          COALESCE(properties->>'delete_schedule', 'unknown') as schedule,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+        GROUP BY COALESCE(properties->>'delete_schedule', 'unknown')
+        ORDER BY count DESC
+      `, [startDate]),
+
+      // Photos by day
+      pool.query(`
+        SELECT
+          DATE(timestamp) as date,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+        GROUP BY DATE(timestamp)
+        ORDER BY date
+      `, [startDate])
+    ]);
+
+    res.json({
+      total_photos: parseInt(totalPhotos.rows[0].count),
+      photos_per_user: parseFloat(photosPerUser.rows[0].avg).toFixed(2),
+      source_breakdown: sourceBreakdown.rows.reduce((acc, row) => {
+        acc[row.source] = parseInt(row.count);
+        return acc;
+      }, {}),
+      schedule_breakdown: scheduleBreakdown.rows.map(row => ({
+        schedule: row.schedule,
+        count: parseInt(row.count)
+      })),
+      daily_trend: photosByDay.rows.map(row => ({
+        date: row.date,
+        count: parseInt(row.count)
+      })),
+      period_days: parseInt(days)
+    });
+  } catch (error) {
+    console.error('Error fetching server photos:', error);
+    res.status(500).json({ error: 'Failed to fetch server photos' });
+  }
+});
+
+// GET /v1/stats/server-scans - Scan analytics from server events
+app.get('/v1/stats/server-scans', requireAuth, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    const [
+      totalScans,
+      completedScans,
+      avgDuration,
+      photosScanned,
+      dateRangeBreakdown,
+      scansByDay
+    ] = await Promise.all([
+      // Total scans started
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE name = 'scan_started'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      // Completed scans
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE name = 'scan_completed'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      // Average scan duration (ms)
+      pool.query(`
+        SELECT
+          COALESCE(AVG((properties->>'duration_ms')::float), 0) as avg_ms
+        FROM events
+        WHERE name = 'scan_completed'
+        AND timestamp >= $1
+        AND properties->>'duration_ms' IS NOT NULL
+      `, [startDate]),
+
+      // Total photos scanned
+      pool.query(`
+        SELECT
+          COALESCE(SUM((properties->>'photos_scanned')::int), 0) as total
+        FROM events
+        WHERE name = 'scan_completed'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      // Date range preference breakdown
+      pool.query(`
+        SELECT
+          COALESCE(properties->>'date_range', 'unknown') as date_range,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'scan_started'
+        AND timestamp >= $1
+        GROUP BY COALESCE(properties->>'date_range', 'unknown')
+        ORDER BY count DESC
+      `, [startDate]),
+
+      // Scans by day
+      pool.query(`
+        SELECT
+          DATE(timestamp) as date,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'scan_started'
+        AND timestamp >= $1
+        GROUP BY DATE(timestamp)
+        ORDER BY date
+      `, [startDate])
+    ]);
+
+    const started = parseInt(totalScans.rows[0].count);
+    const completed = parseInt(completedScans.rows[0].count);
+
+    res.json({
+      total_scans: started,
+      completed_scans: completed,
+      completion_rate: started > 0 ? ((completed / started) * 100).toFixed(1) : 0,
+      avg_duration_ms: parseFloat(avgDuration.rows[0].avg_ms).toFixed(0),
+      total_photos_scanned: parseInt(photosScanned.rows[0].total),
+      date_range_breakdown: dateRangeBreakdown.rows.map(row => ({
+        date_range: row.date_range,
+        count: parseInt(row.count)
+      })),
+      daily_trend: scansByDay.rows.map(row => ({
+        date: row.date,
+        count: parseInt(row.count)
+      })),
+      period_days: parseInt(days)
+    });
+  } catch (error) {
+    console.error('Error fetching server scans:', error);
+    res.status(500).json({ error: 'Failed to fetch server scans' });
+  }
+});
+
+// GET /v1/stats/server-sessions - Session and engagement analytics
+app.get('/v1/stats/server-sessions', requireAuth, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    const [
+      totalSessions,
+      sessionsPerUser,
+      activeUsers,
+      eventsByCategory,
+      topEvents
+    ] = await Promise.all([
+      // Total unique sessions
+      pool.query(`
+        SELECT COUNT(DISTINCT session_id) as count
+        FROM events
+        WHERE timestamp >= $1
+        AND session_id IS NOT NULL
+      `, [startDate]),
+
+      // Avg sessions per user
+      pool.query(`
+        SELECT
+          COALESCE(COUNT(DISTINCT session_id)::float / NULLIF(COUNT(DISTINCT device_id), 0), 0) as avg
+        FROM events
+        WHERE timestamp >= $1
+        AND session_id IS NOT NULL
+      `, [startDate]),
+
+      // Active users by day
+      pool.query(`
+        SELECT
+          DATE(timestamp) as date,
+          COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY DATE(timestamp)
+        ORDER BY date
+      `, [startDate]),
+
+      // Events by category
+      pool.query(`
+        SELECT
+          category,
+          COUNT(*) as count
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY category
+        ORDER BY count DESC
+      `, [startDate]),
+
+      // Top 10 events
+      pool.query(`
+        SELECT
+          name,
+          COUNT(*) as count
+        FROM events
+        WHERE timestamp >= $1
+        GROUP BY name
+        ORDER BY count DESC
+        LIMIT 10
+      `, [startDate])
+    ]);
+
+    res.json({
+      total_sessions: parseInt(totalSessions.rows[0].count),
+      sessions_per_user: parseFloat(sessionsPerUser.rows[0].avg).toFixed(2),
+      daily_active_users: activeUsers.rows.map(row => ({
+        date: row.date,
+        users: parseInt(row.users)
+      })),
+      events_by_category: eventsByCategory.rows.map(row => ({
+        category: row.category,
+        count: parseInt(row.count)
+      })),
+      top_events: topEvents.rows.map(row => ({
+        name: row.name,
+        count: parseInt(row.count)
+      })),
+      period_days: parseInt(days)
+    });
+  } catch (error) {
+    console.error('Error fetching server sessions:', error);
+    res.status(500).json({ error: 'Failed to fetch server sessions' });
+  }
+});
+
+// GET /v1/stats/server-retention - Retention cohort analysis
+app.get('/v1/stats/server-retention', requireAuth, async (req, res) => {
+  try {
+    // Get cohorts for last 4 weeks
+    const cohorts = [];
+
+    for (let i = 0; i < 4; i++) {
+      const cohortStart = new Date();
+      cohortStart.setDate(cohortStart.getDate() - ((i + 1) * 7));
+      cohortStart.setHours(0, 0, 0, 0);
+
+      const cohortEnd = new Date(cohortStart);
+      cohortEnd.setDate(cohortEnd.getDate() + 7);
+
+      // Users who first appeared in this week
+      const cohortUsers = await pool.query(`
+        SELECT device_id
+        FROM events
+        GROUP BY device_id
+        HAVING MIN(timestamp) >= $1 AND MIN(timestamp) < $2
+      `, [cohortStart, cohortEnd]);
+
+      const deviceIds = cohortUsers.rows.map(r => r.device_id);
+
+      if (deviceIds.length === 0) {
+        cohorts.push({
+          week: i + 1,
+          cohort_start: cohortStart.toISOString().split('T')[0],
+          cohort_size: 0,
+          day1: 0,
+          day7: 0,
+          day14: 0,
+          day30: 0
+        });
+        continue;
+      }
+
+      // Calculate retention for each period
+      const retentionPeriods = [1, 7, 14, 30];
+      const retention = {};
+
+      for (const period of retentionPeriods) {
+        const periodStart = new Date(cohortEnd);
+        periodStart.setDate(periodStart.getDate() + period - 1);
+
+        const periodEnd = new Date(periodStart);
+        periodEnd.setDate(periodEnd.getDate() + 1);
+
+        if (periodEnd > new Date()) {
+          retention[`day${period}`] = null;
+          continue;
+        }
+
+        const retainedResult = await pool.query(`
+          SELECT COUNT(DISTINCT device_id) as count
+          FROM events
+          WHERE device_id = ANY($1)
+          AND timestamp >= $2 AND timestamp < $3
+        `, [deviceIds, periodStart, periodEnd]);
+
+        retention[`day${period}`] = parseInt(retainedResult.rows[0].count);
+      }
+
+      cohorts.push({
+        week: i + 1,
+        cohort_start: cohortStart.toISOString().split('T')[0],
+        cohort_size: deviceIds.length,
+        ...retention
+      });
+    }
+
+    res.json({
+      cohorts: cohorts.reverse(), // Oldest first
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching server retention:', error);
+    res.status(500).json({ error: 'Failed to fetch server retention' });
+  }
+});
+
+// GET /v1/stats/server-funnel - Conversion funnel from server events
+app.get('/v1/stats/server-funnel', requireAuth, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    // Define funnel stages
+    const stages = [
+      { name: 'App Opened', event: 'app_opened' },
+      { name: 'Permission Granted', event: 'permission_result', filter: "properties->>'granted' = 'true'" },
+      { name: 'First Photo', event: 'photo_captured' },
+      { name: 'First Scan', event: 'scan_started' },
+      { name: 'Paywall Viewed', event: 'paywall_viewed' },
+      { name: 'Subscription Started', event: 'subscription_started' }
+    ];
+
+    const funnelData = [];
+    let previousCount = 0;
+
+    for (let i = 0; i < stages.length; i++) {
+      const stage = stages[i];
+      let query = `
+        SELECT COUNT(DISTINCT device_id) as count
+        FROM events
+        WHERE name = $1
+        AND timestamp >= $2
+      `;
+      const params = [stage.event, startDate];
+
+      if (stage.filter) {
+        query = `
+          SELECT COUNT(DISTINCT device_id) as count
+          FROM events
+          WHERE name = $1
+          AND timestamp >= $2
+          AND ${stage.filter}
+        `;
+      }
+
+      const result = await pool.query(query, params);
+      const count = parseInt(result.rows[0].count);
+
+      funnelData.push({
+        stage: stage.name,
+        users: count,
+        conversion: previousCount > 0 ? ((count / previousCount) * 100).toFixed(1) : '100.0',
+        drop_off: previousCount > 0 ? (((previousCount - count) / previousCount) * 100).toFixed(1) : '0.0'
+      });
+
+      if (i === 0) previousCount = count;
+      else previousCount = count || previousCount;
+    }
+
+    // Calculate overall conversion
+    const topOfFunnel = funnelData[0]?.users || 0;
+    const bottomOfFunnel = funnelData[funnelData.length - 1]?.users || 0;
+
+    res.json({
+      funnel: funnelData,
+      overall_conversion: topOfFunnel > 0 ? ((bottomOfFunnel / topOfFunnel) * 100).toFixed(2) : '0.00',
+      period_days: parseInt(days)
+    });
+  } catch (error) {
+    console.error('Error fetching server funnel:', error);
+    res.status(500).json({ error: 'Failed to fetch server funnel' });
   }
 });
 
