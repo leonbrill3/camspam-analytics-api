@@ -344,6 +344,26 @@ app.get('/debug/events-count', async (req, res) => {
   }
 });
 
+// Debug endpoint - check photo properties
+app.get('/debug/photo-properties', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        properties->>'source' as source,
+        properties->>'delete_schedule' as delete_schedule,
+        COUNT(*) as count
+      FROM events
+      WHERE name = 'photo_captured'
+      GROUP BY properties->>'source', properties->>'delete_schedule'
+    `);
+    res.json({
+      photo_breakdown: result.rows
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint - check Twilio configuration
 app.get('/debug/twilio', (req, res) => {
   res.json({
