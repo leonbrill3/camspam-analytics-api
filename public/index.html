@@ -4041,53 +4041,51 @@
 
                 // Capture source chart
                 const sourceChart = document.getElementById('serverCaptureSourceChart');
-                if (data.from_app !== undefined && data.from_widget !== undefined) {
-                    const total = (data.from_app || 0) + (data.from_widget || 0);
-                    if (total > 0) {
-                        const appPct = ((data.from_app || 0) / total * 100).toFixed(1);
-                        const widgetPct = ((data.from_widget || 0) / total * 100).toFixed(1);
-                        sourceChart.innerHTML = `
-                            <div style="display: flex; gap: 24px; justify-content: center; align-items: center;">
-                                <div style="text-align: center;">
-                                    <div style="font-size: 32px; font-weight: 700; color: var(--primary);">${appPct}%</div>
-                                    <div style="font-size: 13px; color: var(--text-secondary);">📱 App</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 32px; font-weight: 700; color: var(--accent);">${widgetPct}%</div>
-                                    <div style="font-size: 13px; color: var(--text-secondary);">🔲 Widget</div>
-                                </div>
+                const fromApp = data.from_app || 0;
+                const fromWidget = data.from_widget || 0;
+                const sourceTotal = fromApp + fromWidget;
+                if (sourceTotal > 0) {
+                    const appPct = (fromApp / sourceTotal * 100).toFixed(1);
+                    const widgetPct = (fromWidget / sourceTotal * 100).toFixed(1);
+                    sourceChart.innerHTML = `
+                        <div style="display: flex; gap: 24px; justify-content: center; align-items: center;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 32px; font-weight: 700; color: var(--primary);">${appPct}%</div>
+                                <div style="font-size: 13px; color: var(--text-secondary);">📱 App (${fromApp})</div>
                             </div>
-                        `;
-                    } else {
-                        sourceChart.innerHTML = '<div class="empty-state-text">No photo data yet</div>';
-                    }
+                            <div style="text-align: center;">
+                                <div style="font-size: 32px; font-weight: 700; color: var(--accent);">${widgetPct}%</div>
+                                <div style="font-size: 13px; color: var(--text-secondary);">🔲 Widget (${fromWidget})</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    sourceChart.innerHTML = '<div class="empty-state-text">No photo data yet</div>';
                 }
 
                 // Delete schedule chart
                 const scheduleChart = document.getElementById('serverDeleteScheduleChart');
-                if (data.delete_schedule) {
-                    const schedules = data.delete_schedule;
-                    const total = Object.values(schedules).reduce((a, b) => a + b, 0);
-                    if (total > 0) {
-                        scheduleChart.innerHTML = `
-                            <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
-                                ${Object.entries(schedules).map(([key, val]) => {
-                                    const pct = (val / total * 100).toFixed(0);
-                                    return `
-                                        <div style="display: flex; align-items: center; gap: 12px;">
-                                            <div style="width: 60px; font-size: 12px; color: var(--text-secondary);">${key}</div>
-                                            <div style="flex: 1; height: 20px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                                                <div style="width: ${pct}%; height: 100%; background: var(--primary);"></div>
-                                            </div>
-                                            <div style="width: 40px; font-size: 12px; text-align: right;">${pct}%</div>
+                const schedules = data.delete_schedule || {};
+                const scheduleTotal = Object.values(schedules).reduce((a, b) => a + b, 0);
+                if (scheduleTotal > 0) {
+                    scheduleChart.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                            ${Object.entries(schedules).map(([key, val]) => {
+                                const pct = (val / scheduleTotal * 100).toFixed(0);
+                                return `
+                                    <div style="display: flex; align-items: center; gap: 12px;">
+                                        <div style="width: 80px; font-size: 12px; color: var(--text-secondary);">${key}</div>
+                                        <div style="flex: 1; height: 20px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                            <div style="width: ${pct}%; height: 100%; background: var(--primary);"></div>
                                         </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        `;
-                    } else {
-                        scheduleChart.innerHTML = '<div class="empty-state-text">No schedule data yet</div>';
-                    }
+                                        <div style="width: 50px; font-size: 12px; text-align: right;">${pct}% (${val})</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    `;
+                } else {
+                    scheduleChart.innerHTML = '<div class="empty-state-text">No schedule data yet</div>';
                 }
 
             } catch (e) {
