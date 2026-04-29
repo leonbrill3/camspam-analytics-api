@@ -1049,6 +1049,10 @@ app.get('/v1/stats/subscribers', async (req, res) => {
 
 // POST /v1/events - Receive batch of events from iOS app
 app.post('/v1/events', async (req, res) => {
+  // Log all incoming event requests for debugging
+  const deviceIds = req.body?.events?.map(e => e.device_id).filter(Boolean) || [];
+  console.log(`[Events API] Received ${req.body?.events?.length || 0} events from devices: ${deviceIds.join(', ') || 'unknown'}`);
+
   try {
     const { events } = req.body;
 
