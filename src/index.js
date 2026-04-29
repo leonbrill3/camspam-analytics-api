@@ -438,6 +438,21 @@ app.get('/debug/server-photos', async (req, res) => {
   }
 });
 
+// Debug endpoint - check all recent events
+app.get('/debug/recent-events', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT name, device_id, timestamp, properties
+      FROM events
+      ORDER BY timestamp DESC
+      LIMIT 20
+    `);
+    res.json({ events: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint - check Twilio configuration
 app.get('/debug/twilio', (req, res) => {
   res.json({
