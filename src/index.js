@@ -4506,12 +4506,14 @@ app.get('/v1/stats/server-retention', requireAuth, async (req, res) => {
       if (deviceIds.length === 0) {
         cohorts.push({
           week: i + 1,
+          date: cohortStart.toISOString().split('T')[0],
           cohort_start: cohortStart.toISOString().split('T')[0],
+          users: 0,
           cohort_size: 0,
-          day1: 0,
-          day7: 0,
-          day14: 0,
-          day30: 0
+          day1: null,
+          day7: null,
+          day14: null,
+          day30: null
         });
         continue;
       }
@@ -4542,11 +4544,23 @@ app.get('/v1/stats/server-retention', requireAuth, async (req, res) => {
         retention[`day${period}`] = parseInt(retainedResult.rows[0].count);
       }
 
+      // Convert retention counts to percentages
+      const retentionPct = {};
+      for (const [key, val] of Object.entries(retention)) {
+        if (val === null) {
+          retentionPct[key] = null;
+        } else {
+          retentionPct[key] = deviceIds.length > 0 ? (val / deviceIds.length * 100) : 0;
+        }
+      }
+
       cohorts.push({
         week: i + 1,
+        date: cohortStart.toISOString().split('T')[0],
         cohort_start: cohortStart.toISOString().split('T')[0],
+        users: deviceIds.length,
         cohort_size: deviceIds.length,
-        ...retention
+        ...retentionPct
       });
     }
 
