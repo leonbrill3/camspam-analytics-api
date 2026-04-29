@@ -3996,7 +3996,7 @@
 
                 // Events per user
                 if (data.events_per_user !== undefined) {
-                    document.getElementById('serverEventsPerUser').textContent = data.events_per_user.toFixed(1);
+                    document.getElementById('serverEventsPerUser').textContent = parseFloat(data.events_per_user).toFixed(1);
                 }
 
                 // New users today
@@ -4029,7 +4029,7 @@
 
                 // Photos per user
                 if (data.photos_per_user !== undefined) {
-                    document.getElementById('serverPhotosPerUser').textContent = data.photos_per_user.toFixed(1);
+                    document.getElementById('serverPhotosPerUser').textContent = parseFloat(data.photos_per_user).toFixed(1);
                 }
 
                 // From app
@@ -4116,17 +4116,17 @@
 
                 // Scans per user
                 if (data.scans_per_user !== undefined) {
-                    document.getElementById('serverScansPerUser').textContent = data.scans_per_user.toFixed(1);
+                    document.getElementById('serverScansPerUser').textContent = parseFloat(data.scans_per_user).toFixed(1);
                 }
 
                 // Success rate
                 if (data.success_rate !== undefined) {
-                    document.getElementById('serverScanSuccessRate').textContent = data.success_rate.toFixed(0) + '%';
+                    document.getElementById('serverScanSuccessRate').textContent = parseFloat(data.success_rate).toFixed(0) + '%';
                 }
 
                 // Avg duration
                 if (data.avg_duration_ms !== undefined) {
-                    const seconds = (data.avg_duration_ms / 1000).toFixed(1);
+                    const seconds = (parseFloat(data.avg_duration_ms) / 1000).toFixed(1);
                     document.getElementById('serverAvgScanDuration').textContent = seconds + 's';
                 }
 
@@ -4137,7 +4137,7 @@
 
                 // Photos per scan
                 if (data.photos_per_scan !== undefined) {
-                    document.getElementById('serverPhotosPerScan').textContent = data.photos_per_scan.toFixed(0);
+                    document.getElementById('serverPhotosPerScan').textContent = parseFloat(data.photos_per_scan).toFixed(0);
                 }
 
                 // Spam detected
@@ -4147,7 +4147,7 @@
 
                 // Spam rate
                 if (data.spam_rate !== undefined) {
-                    document.getElementById('serverSpamRate').textContent = data.spam_rate.toFixed(1) + '%';
+                    document.getElementById('serverSpamRate').textContent = parseFloat(data.spam_rate).toFixed(1) + '%';
                 }
 
                 // Date range chart
@@ -4205,7 +4205,7 @@
 
                 // Sessions per user
                 if (data.sessions_per_user !== undefined) {
-                    document.getElementById('serverSessionsPerUser').textContent = data.sessions_per_user.toFixed(1);
+                    document.getElementById('serverSessionsPerUser').textContent = parseFloat(data.sessions_per_user).toFixed(1);
                 }
 
                 // Gallery views
@@ -4215,7 +4215,7 @@
 
                 // Gallery per session
                 if (data.gallery_per_session !== undefined) {
-                    document.getElementById('serverGalleryPerSession').textContent = data.gallery_per_session.toFixed(1);
+                    document.getElementById('serverGalleryPerSession').textContent = parseFloat(data.gallery_per_session).toFixed(1);
                 }
 
             } catch (e) {
