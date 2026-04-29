@@ -4017,6 +4017,9 @@
         async function fetchServerPhotos() {
             try {
                 const res = await authFetch(`${API_BASE}/v1/stats/server-photos`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 const data = await res.json();
 
                 // Total photos
@@ -4090,12 +4093,20 @@
 
             } catch (e) {
                 console.error('Error fetching server photos:', e);
+                // Update UI to show error state
+                const sourceChart = document.getElementById('serverCaptureSourceChart');
+                const scheduleChart = document.getElementById('serverDeleteScheduleChart');
+                if (sourceChart) sourceChart.innerHTML = '<div class="empty-state-text">Error loading data</div>';
+                if (scheduleChart) scheduleChart.innerHTML = '<div class="empty-state-text">Error loading data</div>';
             }
         }
 
         async function fetchServerScans() {
             try {
                 const res = await authFetch(`${API_BASE}/v1/stats/server-scans`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 const data = await res.json();
 
                 // Total scans
@@ -4173,12 +4184,18 @@
 
             } catch (e) {
                 console.error('Error fetching server scans:', e);
+                // Update UI to show error state
+                const rangeChart = document.getElementById('serverDateRangeChart');
+                if (rangeChart) rangeChart.innerHTML = '<div class="empty-state-text">Error loading data</div>';
             }
         }
 
         async function fetchServerSessions() {
             try {
                 const res = await authFetch(`${API_BASE}/v1/stats/server-sessions`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 const data = await res.json();
 
                 // Total sessions
@@ -4203,12 +4220,16 @@
 
             } catch (e) {
                 console.error('Error fetching server sessions:', e);
+                // No chart UI to update in this function
             }
         }
 
         async function fetchServerRetention() {
             try {
                 const res = await authFetch(`${API_BASE}/v1/stats/server-retention`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 const data = await res.json();
 
                 const chart = document.getElementById('serverRetentionChart');
@@ -4261,6 +4282,8 @@
 
             } catch (e) {
                 console.error('Error fetching server retention:', e);
+                const chart = document.getElementById('serverRetentionChart');
+                if (chart) chart.innerHTML = '<div class="empty-state-text">Error loading retention data</div>';
             }
         }
 
@@ -4270,6 +4293,9 @@
         async function fetchServerFunnel() {
             try {
                 const res = await authFetch(`${API_BASE}/v1/stats/server-funnel`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 const data = await res.json();
 
                 const chart = document.getElementById('serverFunnelChart');
@@ -4314,12 +4340,17 @@
 
             } catch (e) {
                 console.error('Error fetching server funnel:', e);
+                const chart = document.getElementById('serverFunnelChart');
+                if (chart) chart.innerHTML = '<div class="empty-state-text">Error loading funnel data</div>';
             }
         }
 
         async function fetchServerRecentEvents() {
             try {
                 const res = await authFetch(`${API_BASE}/v1/events/recent?limit=50`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
                 const data = await res.json();
 
                 const feed = document.getElementById('serverEventsFeed');
@@ -4350,6 +4381,8 @@
 
             } catch (e) {
                 console.error('Error fetching server events:', e);
+                const feed = document.getElementById('serverEventsFeed');
+                if (feed) feed.innerHTML = '<div class="empty-state-text">Error loading events</div>';
             }
         }
 
