@@ -364,6 +364,80 @@ app.get('/debug/photo-properties', async (req, res) => {
   }
 });
 
+// Debug endpoint - test server-photos response (no auth for testing)
+app.get('/debug/server-photos', async (req, res) => {
+  try {
+    const days = 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    const [
+      totalPhotos,
+      photosPerUser,
+      sourceBreakdown,
+      scheduleBreakdown
+    ] = await Promise.all([
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      pool.query(`
+        SELECT
+          COALESCE(COUNT(*)::float / NULLIF(COUNT(DISTINCT device_id), 0), 0) as avg
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      pool.query(`
+        SELECT
+          COALESCE(properties->>'source', 'app') as source,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+        GROUP BY COALESCE(properties->>'source', 'app')
+      `, [startDate]),
+
+      pool.query(`
+        SELECT
+          COALESCE(properties->>'delete_schedule', 'unknown') as schedule,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured'
+        AND timestamp >= $1
+        GROUP BY COALESCE(properties->>'delete_schedule', 'unknown')
+        ORDER BY count DESC
+      `, [startDate])
+    ]);
+
+    const sourceData = sourceBreakdown.rows.reduce((acc, row) => {
+      acc[row.source] = parseInt(row.count);
+      return acc;
+    }, {});
+
+    const scheduleData = scheduleBreakdown.rows.reduce((acc, row) => {
+      acc[row.schedule] = parseInt(row.count);
+      return acc;
+    }, {});
+
+    res.json({
+      total_photos: parseInt(totalPhotos.rows[0].count),
+      photos_per_user: parseFloat(photosPerUser.rows[0].avg).toFixed(2),
+      from_app: sourceData['app'] || 0,
+      from_widget: sourceData['widget'] || 0,
+      source_breakdown: sourceData,
+      delete_schedule: scheduleData
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint - check Twilio configuration
 app.get('/debug/twilio', (req, res) => {
   res.json({
