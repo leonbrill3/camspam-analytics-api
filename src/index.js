@@ -4402,7 +4402,8 @@ app.get('/v1/stats/server-sessions', requireAuth, async (req, res) => {
       sessionsPerUser,
       activeUsers,
       eventsByCategory,
-      topEvents
+      topEvents,
+      galleryViews
     ] = await Promise.all([
       // Total unique sessions
       pool.query(`
@@ -4453,12 +4454,25 @@ app.get('/v1/stats/server-sessions', requireAuth, async (req, res) => {
         GROUP BY name
         ORDER BY count DESC
         LIMIT 10
+      `, [startDate]),
+
+      // Gallery views
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE name = 'gallery_viewed'
+        AND timestamp >= $1
       `, [startDate])
     ]);
 
+    const totalGalleryViews = parseInt(galleryViews.rows[0].count);
+    const totalSessionsCount = parseInt(totalSessions.rows[0].count);
+
     res.json({
-      total_sessions: parseInt(totalSessions.rows[0].count),
+      total_sessions: totalSessionsCount,
       sessions_per_user: parseFloat(sessionsPerUser.rows[0].avg).toFixed(2),
+      gallery_views: totalGalleryViews,
+      gallery_per_session: totalSessionsCount > 0 ? (totalGalleryViews / totalSessionsCount) : 0,
       daily_active_users: activeUsers.rows.map(row => ({
         date: row.date,
         users: parseInt(row.users)
