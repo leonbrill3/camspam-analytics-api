@@ -4253,13 +4253,25 @@ app.get('/v1/stats/server-photos', requireAuth, async (req, res) => {
       `, [startDate])
     ]);
 
+    // Build source breakdown object
+    const sourceData = sourceBreakdown.rows.reduce((acc, row) => {
+      acc[row.source] = parseInt(row.count);
+      return acc;
+    }, {});
+
+    // Build delete schedule object
+    const scheduleData = scheduleBreakdown.rows.reduce((acc, row) => {
+      acc[row.schedule] = parseInt(row.count);
+      return acc;
+    }, {});
+
     res.json({
       total_photos: parseInt(totalPhotos.rows[0].count),
       photos_per_user: parseFloat(photosPerUser.rows[0].avg).toFixed(2),
-      source_breakdown: sourceBreakdown.rows.reduce((acc, row) => {
-        acc[row.source] = parseInt(row.count);
-        return acc;
-      }, {}),
+      from_app: sourceData['app'] || 0,
+      from_widget: sourceData['widget'] || 0,
+      source_breakdown: sourceData,
+      delete_schedule: scheduleData,
       schedule_breakdown: scheduleBreakdown.rows.map(row => ({
         schedule: row.schedule,
         count: parseInt(row.count)
