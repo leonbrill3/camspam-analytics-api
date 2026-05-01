@@ -1456,7 +1456,8 @@ app.get('/v1/stats/features', async (req, res) => {
       photosDeleted,
       scheduleDistribution,
       spamTypeDistribution,
-      featureUsage
+      featureUsage,
+      photosCapturedByDay
     ] = await Promise.all([
       pool.query(`
         SELECT
@@ -1493,6 +1494,17 @@ app.get('/v1/stats/features', async (req, res) => {
         FROM events
         WHERE name = 'feature_toggled' AND timestamp >= $1 AND timestamp <= $2
         GROUP BY properties->>'feature'
+      `, [startDate.toISOString(), endDate.toISOString()]),
+
+      // Photos captured by day for chart
+      pool.query(`
+        SELECT
+          DATE(timestamp) as date,
+          COUNT(*) as count
+        FROM events
+        WHERE name = 'photo_captured' AND timestamp >= $1 AND timestamp <= $2
+        GROUP BY DATE(timestamp)
+        ORDER BY date
       `, [startDate.toISOString(), endDate.toISOString()])
     ]);
 
@@ -1507,7 +1519,8 @@ app.get('/v1/stats/features', async (req, res) => {
       photos_deleted: photosDeleted.rows,
       schedule_distribution: scheduleDistribution.rows,
       spam_type_distribution: spamTypeDistribution.rows,
-      feature_usage: featureUsage.rows
+      feature_usage: featureUsage.rows,
+      photos_captured_by_day: photosCapturedByDay.rows
     });
   } catch (error) {
     console.error('Error fetching feature stats:', error);
