@@ -4812,7 +4812,9 @@ app.get('/v1/server/users', requireAuth, async (req, res) => {
       params.push(monthAgo);
       dateFilter = `AND e.timestamp >= $${paramIndex++}`;
     } else if (date_from && date_to) {
-      params.push(new Date(date_from), new Date(date_to));
+      const endDate = new Date(date_to);
+      endDate.setHours(23, 59, 59, 999);  // Set to end of day
+      params.push(new Date(date_from), endDate);
       dateFilter = `AND e.timestamp >= $${paramIndex++} AND e.timestamp <= $${paramIndex++}`;
     } else if (date_from) {
       params.push(new Date(date_from));
