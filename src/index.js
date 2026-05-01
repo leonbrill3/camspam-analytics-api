@@ -5050,7 +5050,9 @@ app.get('/v1/server/events', requireAuth, async (req, res) => {
         whereClause += ` AND timestamp >= $${paramIndex++}`;
       }
       if (date_to) {
-        params.push(new Date(date_to));
+        const endDate = new Date(date_to);
+        endDate.setHours(23, 59, 59, 999);  // Set to end of day
+        params.push(endDate);
         whereClause += ` AND timestamp <= $${paramIndex++}`;
       }
     }
