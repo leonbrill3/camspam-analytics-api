@@ -345,6 +345,21 @@ app.get('/debug/events-count', async (req, res) => {
   }
 });
 
+// Debug endpoint - list all event types
+app.get('/debug/event-types', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT name, COUNT(*) as count
+      FROM events
+      GROUP BY name
+      ORDER BY count DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Debug endpoint - check photo properties
 app.get('/debug/photo-properties', async (req, res) => {
   try {
