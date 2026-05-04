@@ -2268,6 +2268,26 @@
                     </div>
                 </div>
 
+                <!-- User Countries -->
+                <div class="section-header" style="margin-top: 32px;">
+                    <h2 style="font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                        🌍 User Countries
+                    </h2>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">Top Countries by Users</div>
+                            <div class="chart-subtitle">Geographic distribution (last 30 days)</div>
+                        </div>
+                        <div id="serverCountryCoverage" style="font-size: 12px; color: rgba(255,255,255,0.5);"></div>
+                    </div>
+                    <div id="serverCountriesChart" style="padding: 16px;">
+                        <div class="empty-state-text">Loading...</div>
+                    </div>
+                </div>
+
                 <!-- Retention Chart -->
                 <div class="chart-card" style="margin-top: 24px;">
                     <div class="chart-header">
@@ -3964,7 +3984,8 @@
                 fetchServerSessions(),
                 fetchServerRetention(),
                 fetchServerFunnel(),
-                fetchServerRecentEvents()
+                fetchServerRecentEvents(),
+                fetchServerCountries()
             ]);
         }
 
@@ -4383,6 +4404,75 @@
                 console.error('Error fetching server events:', e);
                 const feed = document.getElementById('serverEventsFeed');
                 if (feed) feed.innerHTML = '<div class="empty-state-text">Error loading events</div>';
+            }
+        }
+
+        async function fetchServerCountries() {
+            try {
+                const res = await authFetch(`${API_BASE}/v1/stats/server-countries?days=30`);
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                const data = await res.json();
+
+                const container = document.getElementById('serverCountriesChart');
+                const coverageEl = document.getElementById('serverCountryCoverage');
+
+                // Show coverage info
+                if (coverageEl && data.coverage) {
+                    coverageEl.textContent = `${data.coverage.coverage_percent}% of events have country data`;
+                }
+
+                if (data.by_users && data.by_users.length > 0) {
+                    // Country code to flag emoji
+                    const countryFlag = (code) => {
+                        if (!code) return '🌍';
+                        const codePoints = [...code.toUpperCase()].map(c => 127397 + c.charCodeAt(0));
+                        return String.fromCodePoint(...codePoints);
+                    };
+
+                    // Country code to name (common ones)
+                    const countryNames = {
+                        'US': 'United States', 'GB': 'United Kingdom', 'CA': 'Canada', 'AU': 'Australia',
+                        'DE': 'Germany', 'FR': 'France', 'IT': 'Italy', 'ES': 'Spain', 'NL': 'Netherlands',
+                        'BR': 'Brazil', 'MX': 'Mexico', 'IN': 'India', 'JP': 'Japan', 'KR': 'South Korea',
+                        'CN': 'China', 'RU': 'Russia', 'SE': 'Sweden', 'NO': 'Norway', 'DK': 'Denmark',
+                        'FI': 'Finland', 'PL': 'Poland', 'BE': 'Belgium', 'AT': 'Austria', 'CH': 'Switzerland',
+                        'IE': 'Ireland', 'NZ': 'New Zealand', 'SG': 'Singapore', 'HK': 'Hong Kong',
+                        'AR': 'Argentina', 'CL': 'Chile', 'CO': 'Colombia', 'ZA': 'South Africa',
+                        'AE': 'UAE', 'SA': 'Saudi Arabia', 'IL': 'Israel', 'TR': 'Turkey', 'PH': 'Philippines',
+                        'TH': 'Thailand', 'MY': 'Malaysia', 'ID': 'Indonesia', 'VN': 'Vietnam', 'TW': 'Taiwan'
+                    };
+
+                    const maxUsers = data.by_users[0].users;
+
+                    container.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 8px;">
+                            ${data.by_users.slice(0, 10).map((row, i) => `
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                    <div style="width: 30px; text-align: center; font-size: 20px;">${countryFlag(row.country)}</div>
+                                    <div style="width: 120px; font-size: 14px;">${countryNames[row.country] || row.country}</div>
+                                    <div style="flex: 1; background: rgba(255,255,255,0.1); border-radius: 4px; height: 20px; overflow: hidden;">
+                                        <div style="width: ${(row.users / maxUsers * 100).toFixed(1)}%; height: 100%; background: linear-gradient(90deg, #007AFF, #5856D6); border-radius: 4px;"></div>
+                                    </div>
+                                    <div style="width: 60px; text-align: right; font-size: 14px; font-weight: 500;">${formatNumber(row.users)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🌍</div>
+                            <div class="empty-state-text">No country data yet - will appear after users send events</div>
+                        </div>
+                    `;
+                }
+
+            } catch (e) {
+                console.error('Error fetching server countries:', e);
+                const container = document.getElementById('serverCountriesChart');
+                if (container) container.innerHTML = '<div class="empty-state-text">Error loading country data</div>';
             }
         }
 

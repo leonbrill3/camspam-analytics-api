@@ -116,6 +116,21 @@ async function migrate() {
     `);
     console.log('Created update_daily_stats function');
 
+    // Add country and ip_address columns to events table (if they don't exist)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'country') THEN
+          ALTER TABLE events ADD COLUMN country VARCHAR(2);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'ip_address') THEN
+          ALTER TABLE events ADD COLUMN ip_address VARCHAR(45);
+        END IF;
+      END $$;
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_events_country ON events(country);`);
+    console.log('Added country and ip_address columns');
+
     console.log('Migration completed successfully!');
   } catch (error) {
     console.error('Migration failed:', error);

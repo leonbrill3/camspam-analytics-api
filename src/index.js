@@ -10,6 +10,7 @@ const twilio = require('twilio');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { GoogleAuth } = require('google-auth-library');
+const geoip = require('geoip-lite');
 
 // API Version for tracking deployments
 const API_VERSION = '2.3.0';
@@ -522,6 +523,8 @@ app.get('/migrate', async (req, res) => {
           device_model VARCHAR(50),
           locale VARCHAR(20),
           timezone VARCHAR(50),
+          country VARCHAR(2),
+          ip_address VARCHAR(45),
           created_at TIMESTAMPTZ DEFAULT NOW()
         );
       `);
@@ -530,6 +533,7 @@ app.get('/migrate', async (req, res) => {
       await client.query(`CREATE INDEX IF NOT EXISTS idx_events_name ON events(name);`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);`);
       await client.query(`CREATE INDEX IF NOT EXISTS idx_events_device_id ON events(device_id);`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_events_country ON events(country);`);
 
       // Create RevenueCat webhook events table
       await client.query(`
@@ -1060,6 +1064,26 @@ app.post('/v1/events', async (req, res) => {
       return res.status(400).json({ error: 'Events array required' });
     }
 
+    // Extract client IP for geolocation
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || req.headers['x-real-ip']
+      || req.socket?.remoteAddress
+      || req.ip;
+
+    // Clean up IPv6 localhost format
+    const cleanIp = clientIp === '::1' ? '127.0.0.1' : clientIp?.replace(/^::ffff:/, '');
+
+    // Lookup country from IP using geoip-lite
+    let country = null;
+    if (cleanIp && cleanIp !== '127.0.0.1') {
+      const geo = geoip.lookup(cleanIp);
+      if (geo) {
+        country = geo.country; // 2-letter ISO country code
+      }
+    }
+
+    console.log(`[Events API] Client IP: ${cleanIp}, Country: ${country || 'unknown'}`);
+
     // Insert all events in a single transaction
     const client = await pool.connect();
     try {
@@ -1071,8 +1095,8 @@ app.post('/v1/events', async (req, res) => {
             name, category, properties, timestamp,
             user_id, device_id, session_id, session_duration_seconds,
             app_version, build_number, platform, os_version,
-            device_model, locale, timezone
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            device_model, locale, timezone, country, ip_address
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         `, [
           event.name,
           event.category || 'engagement',
@@ -1088,7 +1112,9 @@ app.post('/v1/events', async (req, res) => {
           event.os_version,
           event.device_model,
           event.locale,
-          event.timezone
+          event.timezone,
+          country,
+          cleanIp
         ]);
       }
 
@@ -1115,7 +1141,7 @@ app.get('/v1/events/recent', requireAuth, async (req, res) => {
       SELECT
         name, category, properties, timestamp, created_at,
         device_id, session_id, platform, os_version,
-        device_model, app_version, locale, timezone
+        device_model, app_version, locale, timezone, country
       FROM events
       ORDER BY COALESCE(timestamp, created_at) DESC
       LIMIT $1
@@ -4228,7 +4254,8 @@ app.get('/v1/stats/server-overview', requireAuth, async (req, res) => {
       totalEventsResult,
       eventsToday,
       newUsersToday,
-      avgEventsPerUser
+      avgEventsPerUser,
+      topCountries
     ] = await Promise.all([
       // DAU (today)
       pool.query(`
@@ -4287,7 +4314,17 @@ app.get('/v1/stats/server-overview', requireAuth, async (req, res) => {
           COALESCE(COUNT(*)::float / NULLIF(COUNT(DISTINCT device_id), 0), 0) as avg
         FROM events
         WHERE timestamp >= $1
-      `, [monthAgo])
+      `, [monthAgo]),
+
+      // Top countries by unique users (all time)
+      pool.query(`
+        SELECT country, COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE country IS NOT NULL
+        GROUP BY country
+        ORDER BY users DESC
+        LIMIT 10
+      `)
     ]);
 
     const dau = parseInt(dauResult.rows[0].count);
@@ -4303,11 +4340,92 @@ app.get('/v1/stats/server-overview', requireAuth, async (req, res) => {
       events_today: parseInt(eventsToday.rows[0].count),
       new_users_today: parseInt(newUsersToday.rows[0].count),
       avg_events_per_user: parseFloat(avgEventsPerUser.rows[0].avg).toFixed(1),
+      top_countries: topCountries.rows.map(r => ({
+        country: r.country,
+        users: parseInt(r.users)
+      })),
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error fetching server overview:', error);
     res.status(500).json({ error: 'Failed to fetch server overview' });
+  }
+});
+
+// GET /v1/stats/server-countries - Country breakdown from server events
+app.get('/v1/stats/server-countries', requireAuth, async (req, res) => {
+  try {
+    const { days = 30 } = req.query;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days));
+    startDate.setHours(0, 0, 0, 0);
+
+    const [
+      countriesByUsers,
+      countriesByEvents,
+      totalWithCountry,
+      totalWithoutCountry
+    ] = await Promise.all([
+      // Countries by unique users
+      pool.query(`
+        SELECT country, COUNT(DISTINCT device_id) as users
+        FROM events
+        WHERE country IS NOT NULL AND timestamp >= $1
+        GROUP BY country
+        ORDER BY users DESC
+        LIMIT 20
+      `, [startDate]),
+
+      // Countries by event count
+      pool.query(`
+        SELECT country, COUNT(*) as events
+        FROM events
+        WHERE country IS NOT NULL AND timestamp >= $1
+        GROUP BY country
+        ORDER BY events DESC
+        LIMIT 20
+      `, [startDate]),
+
+      // Count events with country
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE country IS NOT NULL AND timestamp >= $1
+      `, [startDate]),
+
+      // Count events without country
+      pool.query(`
+        SELECT COUNT(*) as count
+        FROM events
+        WHERE country IS NULL AND timestamp >= $1
+      `, [startDate])
+    ]);
+
+    const withCountry = parseInt(totalWithCountry.rows[0].count);
+    const withoutCountry = parseInt(totalWithoutCountry.rows[0].count);
+    const total = withCountry + withoutCountry;
+
+    res.json({
+      by_users: countriesByUsers.rows.map(r => ({
+        country: r.country,
+        users: parseInt(r.users)
+      })),
+      by_events: countriesByEvents.rows.map(r => ({
+        country: r.country,
+        events: parseInt(r.events)
+      })),
+      coverage: {
+        with_country: withCountry,
+        without_country: withoutCountry,
+        total: total,
+        coverage_percent: total > 0 ? ((withCountry / total) * 100).toFixed(1) : 0
+      },
+      days: parseInt(days),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching server countries:', error);
+    res.status(500).json({ error: 'Failed to fetch server countries' });
   }
 });
 
