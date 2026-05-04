@@ -4427,6 +4427,8 @@ app.get('/v1/stats/server-scans', requireAuth, async (req, res) => {
       completedScans,
       avgDuration,
       photosScanned,
+      spamDetected,
+      uniqueUsers,
       dateRangeBreakdown,
       scansByDay
     ] = await Promise.all([
@@ -4465,6 +4467,23 @@ app.get('/v1/stats/server-scans', requireAuth, async (req, res) => {
         AND timestamp >= $1
       `, [startDate]),
 
+      // Total spam detected (photos_classified from scan_completed)
+      pool.query(`
+        SELECT
+          COALESCE(SUM((properties->>'photos_classified')::int), 0) as total
+        FROM events
+        WHERE name = 'scan_completed'
+        AND timestamp >= $1
+      `, [startDate]),
+
+      // Unique users who scanned
+      pool.query(`
+        SELECT COUNT(DISTINCT device_id) as count
+        FROM events
+        WHERE name = 'scan_started'
+        AND timestamp >= $1
+      `, [startDate]),
+
       // Date range preference breakdown
       pool.query(`
         SELECT
@@ -4492,13 +4511,22 @@ app.get('/v1/stats/server-scans', requireAuth, async (req, res) => {
 
     const started = parseInt(totalScans.rows[0].count);
     const completed = parseInt(completedScans.rows[0].count);
+    const totalPhotos = parseInt(photosScanned.rows[0].total);
+    const totalSpam = parseInt(spamDetected.rows[0].total);
+    const users = parseInt(uniqueUsers.rows[0].count);
 
     res.json({
       total_scans: started,
       completed_scans: completed,
       completion_rate: started > 0 ? ((completed / started) * 100).toFixed(1) : 0,
+      success_rate: started > 0 ? ((completed / started) * 100).toFixed(1) : 0,
       avg_duration_ms: parseFloat(avgDuration.rows[0].avg_ms).toFixed(0),
-      total_photos_scanned: parseInt(photosScanned.rows[0].total),
+      total_photos_scanned: totalPhotos,
+      photos_scanned: totalPhotos,
+      photos_per_scan: completed > 0 ? (totalPhotos / completed).toFixed(0) : 0,
+      spam_detected: totalSpam,
+      spam_rate: totalPhotos > 0 ? ((totalSpam / totalPhotos) * 100).toFixed(1) : 0,
+      scans_per_user: users > 0 ? (started / users).toFixed(1) : 0,
       date_range_breakdown: dateRangeBreakdown.rows.map(row => ({
         date_range: row.date_range,
         count: parseInt(row.count)
